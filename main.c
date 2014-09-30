@@ -229,8 +229,9 @@ is_solution(graph_t *graph, int i_domination, bit_array_t *solution)
 	/* recursively marks neighbours of nodes from solution in distance
 	   i_dominance */
 	for (i = 0; i < graph->n; i++)
-		domination_rec(graph, domination, solution->data[i],
-		    i_domination);
+		if (solution->data[i])
+			domination_rec(graph, domination, i,
+			    i_domination);
 
 	/* check if all nodes are marked */
 	for (i = 0; i < graph->n; i++) {
