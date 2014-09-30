@@ -1,6 +1,10 @@
 ppr-leharada-nesrotom
 ==================
 
+
+- kompilace: gcc -Wall -pedantic -ggdb -o main main.c
+- valgrind: valgrind --leak-check=full --show-reachable=yes ./main tests/0-graph.txt
+
 co je hotovo:
 - snad funguje nacitani grafu a bitove pole
 - nacrt hledani reseni (neni otestovano, jsou potreba testy)
