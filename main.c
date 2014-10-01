@@ -9,6 +9,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <limits.h>
 
 /******************************************************************************/
 /* structure definitions */
@@ -187,8 +188,72 @@ graph_print(graph_t *graph)
 static int
 graph_diameter(graph_t *graph)
 {
-	/* TODO */
-	return 0;
+    int **distances;
+    int i;
+    int j;
+    int k;
+    int max;
+
+	/* allocate an array of size n*n for distances calculation*/
+	if ((distances = malloc(graph->n * sizeof(int*)))
+	    == NULL) {
+		fprintf(stderr, "malloc distances data has failed\n");
+		exit(EXIT_FAILURE);
+	}
+	for(i = 0; i < graph->n; i++){
+        if ((distances[i] = malloc(graph->n * sizeof(int)))
+            == NULL) {
+            fprintf(stderr, "malloc distances data has failed\n");
+            exit(EXIT_FAILURE);
+        }
+	}
+
+	/* initialize distances matrix*/
+	for(i = 0; i < graph->n; i++){
+        for(j = 0; j < graph->n; j++){
+            if(i == j){
+                distances[i][j] = 0;
+            }
+            else if(graph->am[i][j] == 1){
+                distances[i][j] = 1;
+            }
+            else{
+                distances[i][j] = INT_MAX;
+            }
+        }
+	}
+
+	/* compute matrix of distances */
+	for(i = 0; i < graph->n; i++){
+        for(j = 0; j < graph->n; j++){
+            for(k = 0; k < graph->n; k++){
+                // test to infinity because it can overflow
+                if(distances[j][k] > distances[j][i] + distances[i][k] && distances[j][i] != INT_MAX && distances[i][k] != INT_MAX){
+                    distances[j][k] = distances[j][i] + distances[i][k];
+                }
+            }
+        }
+	}
+
+	/* choose graph diamener, maximum non infinite number in distances matrix */
+	max = 0;
+	for(i = 0; i < graph->n; i++){
+        for(j = 0; j < graph->n; j++){
+            if(distances[i][j] > max && distances[i][j] < INT_MAX){
+                max = distances[i][j];
+            }
+        }
+	}
+
+	/* free allocated space */
+	assert(distances != NULL);
+
+	for(i = 0; i < graph->n; i++){
+        free(distances[i]);
+	}
+	free(distances);
+
+	return max;
 }
 
 
@@ -252,6 +317,7 @@ int
 main(int argc, char *argv[])
 {
 	graph_t *graph;
+	int diameter;
 
 	if (argc != 2) {
 		printf("Usage: %s matrixfile\n", argv[0]);
@@ -260,6 +326,8 @@ main(int argc, char *argv[])
 
 	graph = graph_load(argv[1]);
 	graph_print(graph);
+	diameter = graph_diameter(graph);
+	printf("graph diameter: %d\n", diameter);
 	graph_free(graph);
 
 	return EXIT_SUCCESS;
