@@ -9,7 +9,8 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <limits.h>
+#include <limits.h> /* INT_MAX */
+#include <math.h> /* ceil */
 
 /******************************************************************************/
 /* structure definitions */
@@ -50,12 +51,34 @@ bit_array_init(int n)
 
 	bit_array->n = n;
 
-	if ((bit_array->data = malloc(n * sizeof(char))) == NULL) {
-		fprintf(stderr, "malloc bit_array data has failed\n");
+	if ((bit_array->data = calloc(n, sizeof(char))) == NULL) {
+		fprintf(stderr, "calloc bit_array data has failed\n");
 		exit(EXIT_FAILURE);
 	}
 
 	return bit_array;
+}
+
+static bit_array_t *
+bit_array_clone(bit_array_t *bit_array)
+{
+	bit_array_t *clone;
+
+	clone = bit_array_init(bit_array->n);
+	memcpy(clone->data, bit_array->data, bit_array->n);
+
+	return clone;
+}
+
+static void
+bit_array_print(bit_array_t *bit_array)
+{
+	int i;
+
+	for (i = 0; i < bit_array->n; i++)
+		printf("%c", bit_array->data[i] == 1 ? '1' : '0');
+
+	printf("\n");
 }
 
 static void
@@ -227,8 +250,9 @@ graph_diameter(graph_t *graph)
 	for(i = 0; i < graph->n; i++){
         for(j = 0; j < graph->n; j++){
             for(k = 0; k < graph->n; k++){
-                // test to infinity because it can overflow
-                if(distances[j][k] > distances[j][i] + distances[i][k] && distances[j][i] != INT_MAX && distances[i][k] != INT_MAX){
+                /* test to infinity because it can overflow */
+                if(distances[j][k] > distances[j][i] + distances[i][k] &&
+		    distances[j][i] != INT_MAX && distances[i][k] != INT_MAX){
                     distances[j][k] = distances[j][i] + distances[i][k];
                 }
             }
@@ -261,6 +285,7 @@ graph_diameter(graph_t *graph)
 /* function for i-domintaion */
 
 /* FIXME: this was not tested yet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 static void
 domination_rec(graph_t *graph, bit_array_t *domination, int node, int depth)
@@ -302,12 +327,77 @@ is_solution(graph_t *graph, int i_domination, bit_array_t *solution)
 	for (i = 0; i < graph->n; i++) {
 		if (domination->data[i] == 0) {
 			bit_array_free(domination);
+			printf("solution not found. missing %d\n", i);
 			return 0;
 		}
 	}
 
 	bit_array_free(domination);
+
+	printf("solution found!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! nodes=");
+	bit_array_print(solution);
+
 	return 1;
+}
+
+static void
+solution_try_all_rec(graph_t *graph, int i_domination, bit_array_t *solution,
+    int nodes_min, int nodes_max, int from_position, int nodes)
+{
+	int i;
+	bit_array_t *tmp_solution;
+
+	printf("trying from=%d, nodes=%d solution=", from_position, nodes);
+	bit_array_print(solution);
+
+	if (nodes_max < nodes)
+		return;
+
+	tmp_solution = bit_array_clone(solution);
+
+	for (i = from_position; i < graph->n; i++) {
+		tmp_solution->data[i] = 1;
+
+		solution_try_all_rec(graph, i_domination, tmp_solution,
+		    nodes_min, nodes_max, from_position + 1, nodes + 1);
+		
+		if (nodes_min <= nodes)
+		       is_solution(graph, i_domination, tmp_solution);
+
+		tmp_solution->data[i] = 0;
+	}
+
+	bit_array_free(tmp_solution);
+}
+
+static void
+solution_try_all(graph_t *graph, int i_domination)
+{
+	int diameter;
+	int nodes_min;
+	int nodes_max;
+	bit_array_t *solution;
+
+	assert(i_domination >= 0);
+
+	solution = bit_array_init(graph->n);
+
+	/* TODO: test for these values */
+	diameter = graph_diameter(graph);
+	nodes_min = ceil(diameter/(2*i_domination + 1));
+	nodes_max = ceil(graph->n/(2*i_domination + 1)) + 1;
+
+	printf("diameter=%d, nodes_min=%d, nodes_max=%d\n", diameter, nodes_min,
+	    nodes_max);
+
+	assert(nodes_min <= nodes_max);
+	assert(nodes_min > 0);
+	assert(nodes_max < graph->n);
+
+	solution_try_all_rec(graph, i_domination, solution, nodes_min,
+	    nodes_max, 0, 0);
+
+	bit_array_free(solution);
 }
 
 /******************************************************************************/
@@ -317,17 +407,21 @@ int
 main(int argc, char *argv[])
 {
 	graph_t *graph;
-	int diameter;
+	long int i_domination;
+	char *tmp_c;
 
-	if (argc != 2) {
-		printf("Usage: %s matrixfile\n", argv[0]);
+	if (argc != 3) {
+		printf("Usage: %s matrixfile i-domination\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
+	i_domination = strtol(argv[2], &tmp_c, 10);
+
 	graph = graph_load(argv[1]);
 	graph_print(graph);
-	diameter = graph_diameter(graph);
-	printf("graph diameter: %d\n", diameter);
+
+	solution_try_all(graph, (int) i_domination);
+
 	graph_free(graph);
 
 	return EXIT_SUCCESS;
