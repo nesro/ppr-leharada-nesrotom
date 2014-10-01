@@ -392,7 +392,8 @@ solution_try_all(graph_t *graph, int i_domination)
 
 	assert(nodes_min <= nodes_max);
 	assert(nodes_min > 0);
-	assert(nodes_max < graph->n);
+	assert(nodes_max <= graph->n);
+	assert(i_domination == 0 && nodes_max == graph->n);
 
 	solution_try_all_rec(graph, i_domination, solution, nodes_min,
 	    nodes_max, 0, 0);
