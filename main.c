@@ -360,7 +360,7 @@ solution_try_all_rec(graph_t *graph, int i_domination, bit_array_t *solution,
 
 		solution_try_all_rec(graph, i_domination, tmp_solution,
 		    nodes_min, nodes_max, from_position + 1, nodes + 1);
-		
+
 		if (nodes_min <= nodes)
 		       is_solution(graph, i_domination, tmp_solution);
 
@@ -402,6 +402,90 @@ solution_try_all(graph_t *graph, int i_domination)
 }
 
 /******************************************************************************/
+/* LEHARADA */
+
+static int
+is_solution_leharada(bit_array_t *solution, bit_array_t *dominated_nodes)
+{
+    int i;
+
+    for(i = 0; i < dominated_nodes->n; i++){
+        if(dominated_nodes->data[i] == 0) return 0;
+    }
+
+    printf("SOLUTION: ");
+    bit_array_print(solution);
+
+    return 1;
+}
+
+static void
+add_dominated_nodes_rec_leharada(graph_t *graph, int level, int actual_node, int last_node, bit_array_t *dominated_nodes)
+{
+    int i;
+
+    if(level == 0) return;
+
+    for(i = 0; i < graph->n; i++){
+        if(graph->am[actual_node][i] == 1 && i != last_node){
+            dominated_nodes->data[i] = 1;
+            add_dominated_nodes_rec_leharada(graph, level - 1, i, actual_node, dominated_nodes);
+        }
+    }
+}
+
+static void
+add_dominated_nodes_leharada(graph_t *graph, int i_domination, int node_index, bit_array_t *dominated_nodes)
+{
+    dominated_nodes->data[node_index] = 1;
+    add_dominated_nodes_rec_leharada(graph, i_domination, node_index, -1, dominated_nodes);
+}
+
+static void
+solution_try_all_rec_leharada(graph_t *graph, int i_domination, bit_array_t *solution, bit_array_t *dominated_nodes)
+{
+    int i;
+    int res;
+	bit_array_t *tmp_solution;
+	bit_array_t *tmp_dominated_nodes;
+
+	res = is_solution_leharada(solution, dominated_nodes);
+	if(res == 1) return;
+
+	for(i = 0; i < graph->n; i++){
+        if(solution->data[i] == 0){
+            tmp_solution = bit_array_clone(solution);
+            tmp_dominated_nodes = bit_array_clone(dominated_nodes);
+
+            tmp_solution->data[i] = 1;
+            add_dominated_nodes_leharada(graph, i_domination, i, tmp_dominated_nodes);
+
+            solution_try_all_rec_leharada(graph, i_domination, tmp_solution, tmp_dominated_nodes);
+
+            bit_array_free(tmp_solution);
+            bit_array_free(tmp_dominated_nodes);
+        }
+	}
+}
+
+static void
+solution_try_all_leharada(graph_t *graph, int i_domination)
+{
+	bit_array_t *solution;
+	bit_array_t *dominated_nodes;
+
+	assert(i_domination >= 0);
+
+	solution = bit_array_init(graph->n);
+	dominated_nodes = bit_array_init(graph->n);
+
+    solution_try_all_rec_leharada(graph, i_domination, solution, dominated_nodes);
+
+	bit_array_free(solution);
+	bit_array_free(dominated_nodes);
+}
+
+/******************************************************************************/
 /* main */
 
 int
@@ -419,9 +503,8 @@ main(int argc, char *argv[])
 	i_domination = strtol(argv[2], &tmp_c, 10);
 
 	graph = graph_load(argv[1]);
-	graph_print(graph);
 
-	solution_try_all(graph, (int) i_domination);
+	solution_try_all_leharada(graph, (int) i_domination);
 
 	graph_free(graph);
 
