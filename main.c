@@ -494,6 +494,26 @@ main(int argc, char *argv[])
 	graph_t *graph;
 	long int i_domination;
 	char *tmp_c;
+	int diameter_computed;
+	int diameter_right;
+
+	/*      0         1               2 3 */
+	/* ./main graph.txt --test-diameter N */
+	if (argc >= 3 && strcmp(argv[2], "--test-diameter") == 0) {
+		graph = graph_load(argv[1]);
+		diameter_computed = graph_diameter(graph);
+		graph_free(graph);
+
+		diameter_right = strtol(argv[3], &tmp_c, 10);
+		if (diameter_computed != diameter_right) {
+			fprintf(stderr, "Diameters don't match, "
+			    "computed=%d, right=%d\n", diameter_computed,
+			    diameter_right);
+			return EXIT_FAILURE;
+		} else {
+			return EXIT_SUCCESS;
+		}
+	}
 
 	if (argc != 3) {
 		printf("Usage: %s matrixfile i-domination\n", argv[0]);
