@@ -182,6 +182,31 @@ graph_load(const char *filename)
 }
 
 static void
+graph_save(graph_t *graph, const char *filename)
+{
+	FILE *f;
+	int i;
+	int j;
+
+	if ((f = fopen(filename, "w+")) == NULL) {
+		fprintf(stderr, "failed to open %s: %s\n", filename,
+		    strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	fprintf(f, "%d\n", graph->n);
+	for (i = 0; i < graph->n; i++) {
+		for (j = 0; j < graph->n; j++) {
+			fprintf(f, "%d", graph->am[i][j]);
+		}
+
+		fprintf(f, "\n");
+	}
+
+	fclose(f);
+}
+
+static void
 graph_free(graph_t *graph)
 {
 	assert(graph != NULL);
@@ -280,6 +305,104 @@ graph_diameter(graph_t *graph)
 	return max;
 }
 
+
+static int
+graph_node_count_domination(graph_t *graph, int node, int domination)
+{
+	int i;
+	int result = 0;
+
+	if (domination == 0)
+		return 1;
+
+	for (i = 0; i < graph->n; i++)
+		if (graph->am[node][i] == 1) 
+			result += graph_node_count_domination(graph, i,
+			    domination - 1);
+
+	return result;
+}
+
+static void
+graph_swap_nodes(graph_t *graph, int a, int b)
+{
+	int i;
+	int tmp;
+
+	/* swap a and b column */
+	for (i = 0; i < graph->n; i++) {
+		tmp = graph->am[i][a];
+		graph->am[i][a] = graph->am[i][b];
+		graph->am[i][b] = tmp;
+	}
+
+	/* swap a and b row */
+	for (i = 0; i < graph->n; i++) {
+		tmp = graph->am[a][i];
+		graph->am[a][i] = graph->am[b][i];
+		graph->am[b][i] = tmp;
+	}
+
+#if DEBUG
+	/* FIXME: we dont assume cycles */
+	/* check, if there are zeros on the diagonal */
+	for (i = 0; i < graph->n; i++)
+		assert(graph->am[i][i] == 0);
+#endif /* DEBUG */
+}
+
+/* return an array how the nodes were swapped */
+static int * 
+graph_domination_sort(graph_t *graph, int i_domination)
+{
+	int i;
+	int j;
+	int tmp;
+	int *nodes_domination; /* how many nodes the node dominates */
+	int *trace;
+
+	if ((nodes_domination = malloc(graph->n * sizeof(int))) == NULL) {
+		fprintf(stderr, "gnd mem\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if ((trace = malloc(graph->n * sizeof(int))) == NULL) {
+		fprintf(stderr, "trace mem\n");
+		exit(EXIT_FAILURE);
+	}
+
+	
+	for (i = 0; i < graph->n; i++) {
+		nodes_domination[i] = graph_node_count_domination(graph, i,
+		    i_domination);
+		printf("dom i=%d=%d\n", i, nodes_domination[i]);
+	}
+
+	for (i = 0; i < graph->n; i++)
+		trace[i] = i;
+
+	/* Now we need to sort nodes by their domination in adjacency matrix
+	   and in our nodes_domination array. Algorithm: Bubble sort. */
+	for (i = 0; i < graph->n - 1; i++) {
+		for (j = 0; j < graph->n - i - 1; j++) {
+			if (nodes_domination[j] < nodes_domination[j + 1]) {
+				tmp = nodes_domination[j];
+				nodes_domination[j] = nodes_domination[j + 1];
+				nodes_domination[j + 1] = tmp;
+
+				tmp = trace[j];
+				trace[j] = trace[j + 1];
+				trace[j + 1] = tmp;
+
+				graph_swap_nodes(graph,j, j + 1);
+			}
+		}
+	}
+
+	free(nodes_domination);
+
+	return trace;
+}
 
 /******************************************************************************/
 /* function for i-domintaion */
@@ -492,10 +615,37 @@ int
 main(int argc, char *argv[])
 {
 	graph_t *graph;
-	long int i_domination;
+	int i_domination;
 	char *tmp_c;
 	int diameter_computed;
 	int diameter_right;
+	const char *arg_i_domination;
+	const char *arg_filename_in;
+	const char *arg_filename_out;
+	int *trace;
+	int i;
+
+	/* ./main --optimize i-dominaton input.txt output.txt */
+	if (argc == 5 && !strcmp(argv[1], "--optimize")) {
+		arg_i_domination = argv[2];
+		arg_filename_in = argv[3];
+		arg_filename_out = argv[4];
+
+		graph = graph_load(arg_filename_in);
+		i_domination = strtol(arg_i_domination, &tmp_c, 10);
+		printf("a\n");
+		trace = graph_domination_sort(graph, i_domination);
+		graph_save(graph, arg_filename_out);
+
+		for (i = 0; i < graph->n; i++)
+			printf("%d", trace[i]);
+		printf("\n");
+
+		free(trace);
+		graph_free(graph);
+
+		return EXIT_SUCCESS;
+	}
 
 	/*      0         1               2 3 */
 	/* ./main graph.txt --test-diameter N */
