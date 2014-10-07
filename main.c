@@ -12,7 +12,7 @@
 #include <limits.h> /* INT_MAX */
 #include <math.h> /* ceil */
 
-#define DEFAULT_STACK_SIZE 1000
+#define DEFAULT_STACK_SIZE 10000
 
 /******************************************************************************/
 /* structure definitions */
@@ -39,7 +39,7 @@ typedef struct stack_item {
 typedef struct stack {
 	int size;
 	int items_cnt;
-	stack_item_t *items;
+	stack_item_t **items; /* array of pointers */
 } stack_t;
 
 /******************************************************************************/
@@ -79,6 +79,16 @@ bit_array_clone(bit_array_t *bit_array)
 }
 
 static void
+bit_array_copy(bit_array_t *destination, bit_array_t *source)
+{
+	assert(destination != NULL);
+	assert(source != NULL);
+	assert(destination->n == source->n);
+
+	memcpy(destination->data, source->data, destination->n);
+}
+
+static void
 bit_array_print(bit_array_t *bit_array)
 {
 	int i;
@@ -99,10 +109,58 @@ bit_array_free(bit_array_t *bit_array)
 }
 
 /******************************************************************************/
+/* stack_item functions */
+
+static stack_item_t *
+stack_item_init(int n)
+{
+	stack_item_t *stack_item;
+
+	if ((stack_item = malloc(sizeof(stack_item_t))) == NULL) {
+		fprintf(stderr, "malloc stack_item has failed\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	stack_item->solution = bit_array_init(n);
+	stack_item->dominated_nodes = bit_array_init(n);
+	stack_item->level = 0;
+
+	return stack_item;
+}
+
+static stack_item_t *
+stack_item_clone(stack_item_t *stack_item)
+{
+
+	stack_item_t *clone;
+
+	if ((clone = malloc(sizeof(stack_item_t))) == NULL) {
+		fprintf(stderr, "malloc clone of stack_item has failed\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	clone->solution = bit_array_clone(stack_item->solution);
+	clone->dominated_nodes = bit_array_clone(stack_item->dominated_nodes);
+	clone->level = stack_item->level;
+
+	return clone;
+}
+
+static void
+stack_item_free(stack_item_t *stack_item)
+{
+	assert(stack_item != NULL);
+
+	bit_array_free(stack_item->solution);
+	bit_array_free(stack_item->dominated_nodes);
+	free(stack_item);
+}
+
+/******************************************************************************/
 /* stack functions */
 
 static stack_t *
-stack_init()
+stack_init(void)
 {
 	stack_t *stack;
 
@@ -111,7 +169,8 @@ stack_init()
 		exit(EXIT_FAILURE);
 	}
 
-	if ((stack->items = malloc(DEFAULT_STACK_SIZE * sizeof(stack_item_t))) == NULL) {
+	if ((stack->items = malloc(DEFAULT_STACK_SIZE * sizeof(stack_item_t *)))
+	    == NULL) {
 		fprintf(stderr, "malloc stack items has failed\n");
 		exit(EXIT_FAILURE);
 	}
@@ -122,57 +181,58 @@ stack_init()
 	return stack;
 }
 
-static void
-stack_free(stack_t *stack)
-{
-	assert(stack != NULL);
-
-	free(stack->items);
-	free(stack);
-}
-
 static int
 stack_is_empty(stack_t *stack)
 {
 	assert(stack != NULL);
 
-    if(stack->items_cnt == 0) return 1;
-    return 0;
+	return (stack->items_cnt == 0);
+}
+
+static stack_item_t *
+stack_pop(stack_t *stack)
+{
+	assert(stack->items_cnt > 0);
+
+	stack->items_cnt--;
+	return stack->items[stack->items_cnt];
 }
 
 static void
-stack_push(stack_t *stack, stack_item_t item)
+stack_free(stack_t *stack)
 {
-    int i;
-    stack_item_t *tmp_items;
 
-    if(stack->items_cnt >= stack->size){
-        if ((tmp_items = malloc(2 * stack->size * sizeof(stack_item_t))) == NULL) {
-            fprintf(stderr, "malloc stack tmp items has failed\n");
-            exit(EXIT_FAILURE);
-        }
+	assert(stack != NULL);
 
-        for(i = 0; i < stack->items_cnt; i++){
-            tmp_items[i] = stack->items[i];
-        }
-        free(stack->items);
+	while (!stack_is_empty(stack))
+		stack_item_free(stack_pop(stack));
 
-        stack->items = tmp_items;
-        stack->size = 2 * stack->size;
-    }
-
-    stack->items[stack->items_cnt] = item;
-    stack->items_cnt++;
+	free(stack->items);
+	free(stack);
 }
 
-static stack_item_t
-stack_pop(stack_t *stack)
+static void
+stack_push(stack_t *stack, stack_item_t *item)
 {
-    assert(stack->items_cnt > 0);
+	stack_item_t **tmp_items;
 
-    stack->items_cnt--;
-    return stack->items[stack->items_cnt];
+	if(stack->items_cnt >= stack->size) {
+		stack->size *= 2;
+
+		if ((tmp_items = realloc(stack->items, stack->size *
+		    sizeof(stack_item_t *))) == NULL) {
+			stack_free(stack);
+			fprintf(stderr, "stack realloc has failed\n");
+			exit(EXIT_FAILURE);
+		}
+
+		stack->items = tmp_items;
+	}
+
+	stack->items[stack->items_cnt] = item;
+	stack->items_cnt++;
 }
+
 
 /******************************************************************************/
 /* graph functions */
@@ -299,7 +359,7 @@ graph_free(graph_t *graph)
 	free(graph);
 }
 
-/*static void
+static void
 graph_print(graph_t *graph)
 {
 	int i;
@@ -315,80 +375,80 @@ graph_print(graph_t *graph)
 
 		printf("\n");
 	}
-}*/
+}
 
 static int
 graph_diameter(graph_t *graph)
 {
-    int **distances;
-    int i;
-    int j;
-    int k;
-    int max;
+	int **distances;
+	int *_distances_data;
+	int i;
+	int j;
+	int k;
+	int max;
 
-	/* allocate an array of size n*n for distances calculation*/
+	/* allocate an array of size n*n for distances calculation */
 	if ((distances = malloc(graph->n * sizeof(int*)))
+	    == NULL) {
+		fprintf(stderr, "malloc distances has failed\n");
+		exit(EXIT_FAILURE);
+	}
+
+	/* allocate an array of size n*n */
+	if ((_distances_data = malloc(graph->n * graph->n * sizeof(int)))
 	    == NULL) {
 		fprintf(stderr, "malloc distances data has failed\n");
 		exit(EXIT_FAILURE);
 	}
-	for(i = 0; i < graph->n; i++){
-        if ((distances[i] = malloc(graph->n * sizeof(int)))
-            == NULL) {
-            fprintf(stderr, "malloc distances data has failed\n");
-            exit(EXIT_FAILURE);
-        }
-	}
+
+	/* map pointers to rows */
+	for (i = 0; i < graph->n; i++)
+		distances[i] = _distances_data + i * graph->n;
 
 	/* initialize distances matrix*/
-	for(i = 0; i < graph->n; i++){
-        for(j = 0; j < graph->n; j++){
-            if(i == j){
-                distances[i][j] = 0;
-            }
-            else if(graph->am[i][j] == 1){
-                distances[i][j] = 1;
-            }
-            else{
-                distances[i][j] = INT_MAX;
-            }
-        }
+	for (i = 0; i < graph->n; i++) {
+	for (j = 0; j < graph->n; j++) {
+		if (i == j) {
+			distances[i][j] = 0;
+		} else if (graph->am[i][j] == 1) {
+			distances[i][j] = 1;
+		} else {
+			distances[i][j] = INT_MAX;
+		}
+	}
 	}
 
 	/* compute matrix of distances */
-	for(i = 0; i < graph->n; i++){
-        for(j = 0; j < graph->n; j++){
-            for(k = 0; k < graph->n; k++){
-                /* test to infinity because it can overflow */
-                if(distances[j][k] > distances[j][i] + distances[i][k] &&
-		    distances[j][i] != INT_MAX && distances[i][k] != INT_MAX){
-                    distances[j][k] = distances[j][i] + distances[i][k];
-                }
-            }
-        }
+	for (i = 0; i < graph->n; i++) {
+	for (j = 0; j < graph->n; j++) {
+	for (k = 0; k < graph->n; k++) {
+		/* test to infinity because it can overflow */
+		if(distances[j][k] > distances[j][i] + distances[i][k] &&
+		    distances[j][i] != INT_MAX &&
+		    distances[i][k] != INT_MAX) {
+			distances[j][k] = distances[j][i] + distances[i][k];
+		}
+	}
+	}
 	}
 
-	/* choose graph diamener, maximum non infinite number in distances matrix */
+	/* choose graph diamener, maximum non infinite number in distances
+	   matrix */
 	max = 0;
-	for(i = 0; i < graph->n; i++){
-        for(j = 0; j < graph->n; j++){
-            if(distances[i][j] > max && distances[i][j] < INT_MAX){
-                max = distances[i][j];
-            }
-        }
+	for (i = 0; i < graph->n; i++) {
+	for (j = 0; j < graph->n; j++) {
+		if (distances[i][j] > max && distances[i][j] < INT_MAX) {
+			max = distances[i][j];
+		}
+	}
 	}
 
 	/* free allocated space */
-	assert(distances != NULL);
-
-	for(i = 0; i < graph->n; i++){
-        free(distances[i]);
-	}
 	free(distances);
+	free(_distances_data);
 
 	return max;
 }
-
 
 static int
 graph_node_count_domination(graph_t *graph, int node, int domination)
@@ -400,7 +460,7 @@ graph_node_count_domination(graph_t *graph, int node, int domination)
 		return 1;
 
 	for (i = 0; i < graph->n; i++)
-		if (graph->am[node][i] == 1)
+		if (graph->am[node][i] == 1) /* XXX */
 			result += graph_node_count_domination(graph, i,
 			    domination - 1);
 
@@ -426,13 +486,6 @@ graph_swap_nodes(graph_t *graph, int a, int b)
 		graph->am[a][i] = graph->am[b][i];
 		graph->am[b][i] = tmp;
 	}
-
-#if DEBUG
-	/* FIXME: we dont assume cycles */
-	/* check, if there are zeros on the diagonal */
-	for (i = 0; i < graph->n; i++)
-		assert(graph->am[i][i] == 0);
-#endif /* DEBUG */
 }
 
 /* return an array how the nodes were swapped */
@@ -465,6 +518,7 @@ graph_domination_sort(graph_t *graph, int i_domination)
 	for (i = 0; i < graph->n; i++)
 		trace[i] = i;
 
+	/* TODO: quicksort */
 	/* Now we need to sort nodes by their domination in adjacency matrix
 	   and in our nodes_domination array. Algorithm: Bubble sort. */
 	for (i = 0; i < graph->n - 1; i++) {
@@ -492,116 +546,117 @@ graph_domination_sort(graph_t *graph, int i_domination)
 /* solution */
 
 static int
-is_solution(bit_array_t *solution, bit_array_t *dominated_nodes)
+is_solution(stack_item_t *item)
 {
-    int i;
+	int i;
 
-    for(i = 0; i < dominated_nodes->n; i++){
-        if(dominated_nodes->data[i] == 0) return 0;
-    }
+	for (i = 0; i < item->dominated_nodes->n; i++)
+		if (item->dominated_nodes->data[i] == 0)
+			return 0;
 
-    return 1;
+	return 1;
 }
 
 static void
-add_dominated_nodes_rec(graph_t *graph, int level, int actual_node, int last_node, bit_array_t *dominated_nodes)
+add_dominated_nodes_rec(graph_t *graph, int level, int actual_node,
+    int last_node, bit_array_t *dominated_nodes)
 {
-    int i;
+	int i;
 
-    if(level == 0) return;
+	if (level == 0)
+		return;
 
-    for(i = 0; i < graph->n; i++){
-        if(graph->am[actual_node][i] == 1 && i != last_node){
-            dominated_nodes->data[i] = 1;
-            add_dominated_nodes_rec(graph, level - 1, i, actual_node, dominated_nodes);
-        }
-    }
+	for (i = 0; i < graph->n; i++) {
+		if (graph->am[actual_node][i] == 1 && i != last_node) {
+			dominated_nodes->data[i] = 1;
+			add_dominated_nodes_rec(graph, level - 1, i,
+			    actual_node, dominated_nodes);
+		}
+	}
 }
 
 static void
-add_dominated_nodes(graph_t *graph, int i_domination, int node_index, bit_array_t *dominated_nodes)
+add_dominated_nodes(graph_t *graph, int i_domination, int node_index,
+    bit_array_t *dominated_nodes)
 {
-    dominated_nodes->data[node_index] = 1;
-    add_dominated_nodes_rec(graph, i_domination, node_index, -1, dominated_nodes);
+	dominated_nodes->data[node_index] = 1;
+	add_dominated_nodes_rec(graph, i_domination, node_index, -1,
+	    dominated_nodes);
 }
 
 static bit_array_t*
 solution_try_all(graph_t *graph, int i_domination)
 {
-	bit_array_t *solution;
-	bit_array_t *dominated_nodes;
 	stack_t *stack;
-	stack_item_t item;
-	stack_item_t tmp_item;
 	int i;
-    int res;
-    int diameter;
-    int nodes_min;
-    int nodes_max;
-    bit_array_t *best_solution = NULL;
-    int best_solution_nodes = INT_MAX;
-    bit_array_t *tmp_solution;
-    bit_array_t *tmp_dominated_nodes;
+	int diameter;
+	int nodes_min;
+	int nodes_max;
+	bit_array_t *best_solution;
+	int best_solution_nodes;
+	stack_item_t *item;
+	stack_item_t *tmp_item;
 
 	assert(i_domination >= 0);
-
-	solution = bit_array_init(graph->n);
-	dominated_nodes = bit_array_init(graph->n);
 
 	diameter = graph_diameter(graph);
 	nodes_min = ceil(diameter/(2.0*i_domination + 1));
 	nodes_max = ceil(graph->n/(2.0*i_domination + 1));
 
+	assert(nodes_min <= nodes_max);
+	assert(nodes_min > 0);
+	assert(nodes_max < graph->n);
+	assert(nodes_max <= graph->n);
+	assert(i_domination > 0 || (i_domination == 0 && nodes_max ==
+	    graph->n));
+
+	best_solution = bit_array_init(graph->n);
+	best_solution_nodes = INT_MAX;
+
 	stack = stack_init();
-	item.level = 0;
-	item.solution = solution;
-	item.dominated_nodes = dominated_nodes;
+	item = stack_item_init(graph->n);
 	stack_push(stack, item);
 
-    while(stack_is_empty(stack) == 0){
-        item = stack_pop(stack);
+	while (!stack_is_empty(stack)) {
+		item = stack_pop(stack);
 
-        /* BB if actual solution will not be better than best solution or actual solution has more nodes than upper bound */
-        if(item.level >= best_solution_nodes || item.level > nodes_max){
-            continue;
-        }
+		/* BB if actual solution will not be better than best solution
+		   or actual solution has more nodes than upper bound */
+		if (item->level >= best_solution_nodes ||
+		    item->level > nodes_max) {
+			stack_item_free(item);
+			continue;
+		}
 
-        res = is_solution(item.solution, item.dominated_nodes);
-        if(res == 1){
-            if(best_solution != NULL){
-                bit_array_free(best_solution);
-            }
-            best_solution = bit_array_clone(item.solution);
-            best_solution_nodes = item.level;
+		if (is_solution(item)) {
+			bit_array_copy(best_solution, item->solution);
 
-            bit_array_free(item.solution);
-            bit_array_free(item.dominated_nodes);
+			/* better solution don't exist, this is lower bound */
+			if (item->level <= nodes_min) {
+				stack_item_free(item);
+				break;
+			}
 
-            /* better solution don't exist, this is lower bound */
-            if(item.level <= nodes_min){
-                break;
-            }
-            continue;
-        }
+			stack_item_free(item);
+			continue;
+		}
 
-        for(i = graph->n - 1; i >= 0; i--){
-            if(item.solution->data[i] == 0){
-                tmp_solution = bit_array_clone(item.solution);
-                tmp_dominated_nodes = bit_array_clone(item.dominated_nodes);
+		item->level++;
 
-                tmp_solution->data[i] = 1;
-                add_dominated_nodes(graph, i_domination, i, tmp_dominated_nodes);
+		for (i = graph->n - 1; i >= 0; i--) {
+			if (item->solution->data[i] == 0) {
+				tmp_item = stack_item_clone(item);
 
-                tmp_item.level = item.level + 1;
-                tmp_item.solution = tmp_solution;
-                tmp_item.dominated_nodes = tmp_dominated_nodes;
-                stack_push(stack, tmp_item);
-            }
-        }
+				tmp_item->solution->data[i] = 1;
+				add_dominated_nodes(graph, i_domination, i,
+				    tmp_item->dominated_nodes);
 
-        bit_array_free(item.solution);
-        bit_array_free(item.dominated_nodes);
-    }
+				stack_push(stack, tmp_item);
+			}
+		}
+
+		stack_item_free(item);
+	}
 
 	stack_free(stack);
 
@@ -624,7 +679,7 @@ main(int argc, char *argv[])
 	const char *arg_filename_out;
 	int *trace;
 	int i;
-	bit_array_t *solution;
+	bit_array_t *solution = NULL;
 
 	/* ./main --optimize i-dominaton input.txt output.txt */
 	if (argc == 5 && !strcmp(argv[1], "--optimize")) {
@@ -634,7 +689,7 @@ main(int argc, char *argv[])
 
 		graph = graph_load(arg_filename_in);
 		i_domination = strtol(arg_i_domination, &tmp_c, 10);
-		printf("a\n");
+
 		trace = graph_domination_sort(graph, i_domination);
 		graph_save(graph, arg_filename_out);
 
@@ -648,9 +703,8 @@ main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	}
 
-	/*      0         1               2 3 */
 	/* ./main graph.txt --test-diameter N */
-	if (argc >= 3 && strcmp(argv[2], "--test-diameter") == 0) {
+	if (argc >= 3 && !strcmp(argv[2], "--test-diameter")) {
 		graph = graph_load(argv[1]);
 		diameter_computed = graph_diameter(graph);
 		graph_free(graph);
@@ -675,14 +729,11 @@ main(int argc, char *argv[])
 
 	graph = graph_load(argv[1]);
 
-	solution = solution_try_all(graph, (int) i_domination);
+	solution = solution_try_all(graph, i_domination);
 	bit_array_print(solution);
 
 	graph_free(graph);
-
-    if(solution != NULL){
-        free(solution);
-    }
+	bit_array_free(solution);
 
 	return EXIT_SUCCESS;
 }

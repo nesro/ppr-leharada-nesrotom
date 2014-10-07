@@ -28,3 +28,7 @@
 *.x86_64
 *.hex
 main
+
+#vim swap file
+*.swp
+
