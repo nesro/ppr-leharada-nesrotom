@@ -11,4 +11,4 @@ paralelni algoritmus je L-PBB-DFS-D:
 https://edux.fit.cvut.cz/courses/MI-PPR.2/labs/prohledavani_do_hloubky#paralelni_bb-dfs_s_prohledavanim_dde_stavoveho_prostoru_pbb-dfs-d
 
 TODO:
-testy na horni a dolni mez, na polomer a na reseni i-dominance
+Odstranit chyby hlasene Valgrindem
