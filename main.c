@@ -12,6 +12,8 @@
 #include <limits.h> /* INT_MAX */
 #include <math.h> /* ceil */
 
+#define DEFAULT_STACK_SIZE 1000
+
 /******************************************************************************/
 /* structure definitions */
 
@@ -28,10 +30,16 @@ typedef struct graph {
 	char *_data;
 } graph_t;
 
+typedef struct stack_item {
+	bit_array_t *solution;
+	bit_array_t *dominated_nodes;
+	int level;
+} stack_item_t;
+
 typedef struct stack {
 	int size;
 	int items_cnt;
-	void *items;
+	stack_item_t *items;
 } stack_t;
 
 /******************************************************************************/
@@ -88,6 +96,82 @@ bit_array_free(bit_array_t *bit_array)
 
 	free(bit_array->data);
 	free(bit_array);
+}
+
+/******************************************************************************/
+/* stack functions */
+
+static stack_t *
+stack_init()
+{
+	stack_t *stack;
+
+	if ((stack = malloc(sizeof(stack_t))) == NULL) {
+		fprintf(stderr, "malloc stack has failed\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if ((stack->items = malloc(DEFAULT_STACK_SIZE * sizeof(stack_item_t))) == NULL) {
+		fprintf(stderr, "malloc stack items has failed\n");
+		exit(EXIT_FAILURE);
+	}
+
+	stack->size = DEFAULT_STACK_SIZE;
+	stack->items_cnt = 0;
+
+	return stack;
+}
+
+static void
+stack_free(stack_t *stack)
+{
+	assert(stack != NULL);
+
+	free(stack->items);
+	free(stack);
+}
+
+static int
+stack_is_empty(stack_t *stack)
+{
+	assert(stack != NULL);
+
+    if(stack->items_cnt == 0) return 1;
+    return 0;
+}
+
+static void
+stack_push(stack_t *stack, stack_item_t item)
+{
+    int i;
+    stack_item_t *tmp_items;
+
+    if(stack->items_cnt >= stack->size){
+        if ((tmp_items = malloc(2 * stack->size * sizeof(stack_item_t))) == NULL) {
+            fprintf(stderr, "malloc stack tmp items has failed\n");
+            exit(EXIT_FAILURE);
+        }
+
+        for(i = 0; i < stack->items_cnt; i++){
+            tmp_items[i] = stack->items[i];
+        }
+        free(stack->items);
+
+        stack->items = tmp_items;
+        stack->size = 2 * stack->size;
+    }
+
+    stack->items[stack->items_cnt] = item;
+    stack->items_cnt++;
+}
+
+static stack_item_t
+stack_pop(stack_t *stack)
+{
+    assert(stack->items_cnt > 0);
+
+    stack->items_cnt--;
+    return stack->items[stack->items_cnt];
 }
 
 /******************************************************************************/
@@ -215,7 +299,7 @@ graph_free(graph_t *graph)
 	free(graph);
 }
 
-static void
+/*static void
 graph_print(graph_t *graph)
 {
 	int i;
@@ -231,7 +315,7 @@ graph_print(graph_t *graph)
 
 		printf("\n");
 	}
-}
+}*/
 
 static int
 graph_diameter(graph_t *graph)
@@ -316,7 +400,7 @@ graph_node_count_domination(graph_t *graph, int node, int domination)
 		return 1;
 
 	for (i = 0; i < graph->n; i++)
-		if (graph->am[node][i] == 1) 
+		if (graph->am[node][i] == 1)
 			result += graph_node_count_domination(graph, i,
 			    domination - 1);
 
@@ -352,7 +436,7 @@ graph_swap_nodes(graph_t *graph, int a, int b)
 }
 
 /* return an array how the nodes were swapped */
-static int * 
+static int *
 graph_domination_sort(graph_t *graph, int i_domination)
 {
 	int i;
@@ -371,7 +455,7 @@ graph_domination_sort(graph_t *graph, int i_domination)
 		exit(EXIT_FAILURE);
 	}
 
-	
+
 	for (i = 0; i < graph->n; i++) {
 		nodes_domination[i] = graph_node_count_domination(graph, i,
 		    i_domination);
@@ -405,130 +489,10 @@ graph_domination_sort(graph_t *graph, int i_domination)
 }
 
 /******************************************************************************/
-/* function for i-domintaion */
-
-/* FIXME: this was not tested yet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-static void
-domination_rec(graph_t *graph, bit_array_t *domination, int node, int depth)
-{
-	int i;
-
-	domination->data[node] = 1;
-
-	if (depth == 0)
-		return;
-
-	for (i = 0; i < graph->n; i++)
-		if (graph->am[node][i])
-			domination_rec(graph, domination, graph->am[node][i],
-			    depth - 1);
-}
-
-/*
-   solution is a bit_array that marks which nodes are creating an i-dominator
-*/
-static int
-is_solution(graph_t *graph, int i_domination, bit_array_t *solution)
-{
-	int i;
-	bit_array_t *domination;
-
-	assert(i_domination >= 0);
-
-	domination = bit_array_init(graph->n);
-
-	/* recursively marks neighbours of nodes from solution in distance
-	   i_dominance */
-	for (i = 0; i < graph->n; i++)
-		if (solution->data[i])
-			domination_rec(graph, domination, i,
-			    i_domination);
-
-	/* check if all nodes are marked */
-	for (i = 0; i < graph->n; i++) {
-		if (domination->data[i] == 0) {
-			bit_array_free(domination);
-			printf("solution not found. missing %d\n", i);
-			return 0;
-		}
-	}
-
-	bit_array_free(domination);
-
-	printf("solution found!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! nodes=");
-	bit_array_print(solution);
-
-	return 1;
-}
-
-static void
-solution_try_all_rec(graph_t *graph, int i_domination, bit_array_t *solution,
-    int nodes_min, int nodes_max, int from_position, int nodes)
-{
-	int i;
-	bit_array_t *tmp_solution;
-
-	printf("trying from=%d, nodes=%d solution=", from_position, nodes);
-	bit_array_print(solution);
-
-	if (nodes_max < nodes)
-		return;
-
-	tmp_solution = bit_array_clone(solution);
-
-	for (i = from_position; i < graph->n; i++) {
-		tmp_solution->data[i] = 1;
-
-		solution_try_all_rec(graph, i_domination, tmp_solution,
-		    nodes_min, nodes_max, from_position + 1, nodes + 1);
-
-		if (nodes_min <= nodes)
-		       is_solution(graph, i_domination, tmp_solution);
-
-		tmp_solution->data[i] = 0;
-	}
-
-	bit_array_free(tmp_solution);
-}
-
-static void
-solution_try_all(graph_t *graph, int i_domination)
-{
-	int diameter;
-	int nodes_min;
-	int nodes_max;
-	bit_array_t *solution;
-
-	assert(i_domination >= 0);
-
-	solution = bit_array_init(graph->n);
-
-	/* TODO: test for these values */
-	diameter = graph_diameter(graph);
-	nodes_min = ceil(diameter/(2*i_domination + 1));
-	nodes_max = ceil(graph->n/(2*i_domination + 1)) + 1;
-
-	printf("diameter=%d, nodes_min=%d, nodes_max=%d\n", diameter, nodes_min,
-	    nodes_max);
-
-	assert(nodes_min <= nodes_max);
-	assert(nodes_min > 0);
-	assert(nodes_max <= graph->n);
-	assert(i_domination == 0 && nodes_max == graph->n);
-
-	solution_try_all_rec(graph, i_domination, solution, nodes_min,
-	    nodes_max, 0, 0);
-
-	bit_array_free(solution);
-}
-
-/******************************************************************************/
-/* LEHARADA */
+/* solution */
 
 static int
-is_solution_leharada(bit_array_t *solution, bit_array_t *dominated_nodes)
+is_solution(bit_array_t *solution, bit_array_t *dominated_nodes)
 {
     int i;
 
@@ -536,14 +500,11 @@ is_solution_leharada(bit_array_t *solution, bit_array_t *dominated_nodes)
         if(dominated_nodes->data[i] == 0) return 0;
     }
 
-    printf("SOLUTION: ");
-    bit_array_print(solution);
-
     return 1;
 }
 
 static void
-add_dominated_nodes_rec_leharada(graph_t *graph, int level, int actual_node, int last_node, bit_array_t *dominated_nodes)
+add_dominated_nodes_rec(graph_t *graph, int level, int actual_node, int last_node, bit_array_t *dominated_nodes)
 {
     int i;
 
@@ -552,60 +513,99 @@ add_dominated_nodes_rec_leharada(graph_t *graph, int level, int actual_node, int
     for(i = 0; i < graph->n; i++){
         if(graph->am[actual_node][i] == 1 && i != last_node){
             dominated_nodes->data[i] = 1;
-            add_dominated_nodes_rec_leharada(graph, level - 1, i, actual_node, dominated_nodes);
+            add_dominated_nodes_rec(graph, level - 1, i, actual_node, dominated_nodes);
         }
     }
 }
 
 static void
-add_dominated_nodes_leharada(graph_t *graph, int i_domination, int node_index, bit_array_t *dominated_nodes)
+add_dominated_nodes(graph_t *graph, int i_domination, int node_index, bit_array_t *dominated_nodes)
 {
     dominated_nodes->data[node_index] = 1;
-    add_dominated_nodes_rec_leharada(graph, i_domination, node_index, -1, dominated_nodes);
+    add_dominated_nodes_rec(graph, i_domination, node_index, -1, dominated_nodes);
 }
 
-static void
-solution_try_all_rec_leharada(graph_t *graph, int i_domination, bit_array_t *solution, bit_array_t *dominated_nodes)
-{
-    int i;
-    int res;
-	bit_array_t *tmp_solution;
-	bit_array_t *tmp_dominated_nodes;
-
-	res = is_solution_leharada(solution, dominated_nodes);
-	if(res == 1) return;
-
-	for(i = 0; i < graph->n; i++){
-        if(solution->data[i] == 0){
-            tmp_solution = bit_array_clone(solution);
-            tmp_dominated_nodes = bit_array_clone(dominated_nodes);
-
-            tmp_solution->data[i] = 1;
-            add_dominated_nodes_leharada(graph, i_domination, i, tmp_dominated_nodes);
-
-            solution_try_all_rec_leharada(graph, i_domination, tmp_solution, tmp_dominated_nodes);
-
-            bit_array_free(tmp_solution);
-            bit_array_free(tmp_dominated_nodes);
-        }
-	}
-}
-
-static void
-solution_try_all_leharada(graph_t *graph, int i_domination)
+static bit_array_t*
+solution_try_all(graph_t *graph, int i_domination)
 {
 	bit_array_t *solution;
 	bit_array_t *dominated_nodes;
+	stack_t *stack;
+	stack_item_t item;
+	stack_item_t tmp_item;
+	int i;
+    int res;
+    int diameter;
+    int nodes_min;
+    int nodes_max;
+    bit_array_t *best_solution = NULL;
+    int best_solution_nodes = INT_MAX;
+    bit_array_t *tmp_solution;
+    bit_array_t *tmp_dominated_nodes;
 
 	assert(i_domination >= 0);
 
 	solution = bit_array_init(graph->n);
 	dominated_nodes = bit_array_init(graph->n);
 
-    solution_try_all_rec_leharada(graph, i_domination, solution, dominated_nodes);
+	diameter = graph_diameter(graph);
+	nodes_min = ceil(diameter/(2.0*i_domination + 1));
+	nodes_max = ceil(graph->n/(2.0*i_domination + 1));
 
-	bit_array_free(solution);
-	bit_array_free(dominated_nodes);
+	stack = stack_init();
+	item.level = 0;
+	item.solution = solution;
+	item.dominated_nodes = dominated_nodes;
+	stack_push(stack, item);
+
+    while(stack_is_empty(stack) == 0){
+        item = stack_pop(stack);
+
+        /* BB if actual solution will not be better than best solution or actual solution has more nodes than upper bound */
+        if(item.level >= best_solution_nodes || item.level > nodes_max){
+            continue;
+        }
+
+        res = is_solution(item.solution, item.dominated_nodes);
+        if(res == 1){
+            if(best_solution != NULL){
+                bit_array_free(best_solution);
+            }
+            best_solution = bit_array_clone(item.solution);
+            best_solution_nodes = item.level;
+
+            bit_array_free(item.solution);
+            bit_array_free(item.dominated_nodes);
+
+            /* better solution don't exist, this is lower bound */
+            if(item.level <= nodes_min){
+                break;
+            }
+            continue;
+        }
+
+        for(i = graph->n - 1; i >= 0; i--){
+            if(item.solution->data[i] == 0){
+                tmp_solution = bit_array_clone(item.solution);
+                tmp_dominated_nodes = bit_array_clone(item.dominated_nodes);
+
+                tmp_solution->data[i] = 1;
+                add_dominated_nodes(graph, i_domination, i, tmp_dominated_nodes);
+
+                tmp_item.level = item.level + 1;
+                tmp_item.solution = tmp_solution;
+                tmp_item.dominated_nodes = tmp_dominated_nodes;
+                stack_push(stack, tmp_item);
+            }
+        }
+
+        bit_array_free(item.solution);
+        bit_array_free(item.dominated_nodes);
+    }
+
+	stack_free(stack);
+
+	return best_solution;
 }
 
 /******************************************************************************/
@@ -624,6 +624,7 @@ main(int argc, char *argv[])
 	const char *arg_filename_out;
 	int *trace;
 	int i;
+	bit_array_t *solution;
 
 	/* ./main --optimize i-dominaton input.txt output.txt */
 	if (argc == 5 && !strcmp(argv[1], "--optimize")) {
@@ -674,9 +675,14 @@ main(int argc, char *argv[])
 
 	graph = graph_load(argv[1]);
 
-	solution_try_all_leharada(graph, (int) i_domination);
+	solution = solution_try_all(graph, (int) i_domination);
+	bit_array_print(solution);
 
 	graph_free(graph);
+
+    if(solution != NULL){
+        free(solution);
+    }
 
 	return EXIT_SUCCESS;
 }
