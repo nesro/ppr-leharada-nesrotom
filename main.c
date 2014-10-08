@@ -120,7 +120,7 @@ stack_item_init(int n)
 		fprintf(stderr, "malloc stack_item has failed\n");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	stack_item->solution = bit_array_init(n);
 	stack_item->dominated_nodes = bit_array_init(n);
 	stack_item->level = 0;
@@ -138,7 +138,7 @@ stack_item_clone(stack_item_t *stack_item)
 		fprintf(stderr, "malloc clone of stack_item has failed\n");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	clone->solution = bit_array_clone(stack_item->solution);
 	clone->dominated_nodes = bit_array_clone(stack_item->dominated_nodes);
 	clone->level = stack_item->level;
@@ -597,11 +597,12 @@ solution_try_all(graph_t *graph, int i_domination)
 	stack_item_t *item;
 	stack_item_t *tmp_item;
 
-	assert(i_domination >= 0);
+	assert(i_domination > 0);
 
 	diameter = graph_diameter(graph);
 	nodes_min = ceil(diameter/(2.0*i_domination + 1));
-	nodes_max = ceil(graph->n/(2.0*i_domination + 1));
+	/* invalid formula for max nodes */
+	nodes_max = ceil(graph->n/(2.0*i_domination + 1) + 1);
 
 	assert(nodes_min <= nodes_max);
 	assert(nodes_min > 0);
@@ -630,6 +631,8 @@ solution_try_all(graph_t *graph, int i_domination)
 
 		if (is_solution(item)) {
 			bit_array_copy(best_solution, item->solution);
+			/* actualize number of nodes for actual best solution */
+			best_solution_nodes = item->level;
 
 			/* better solution don't exist, this is lower bound */
 			if (item->level <= nodes_min) {
