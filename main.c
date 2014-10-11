@@ -12,6 +12,40 @@
 #include <limits.h> /* INT_MAX */
 #include <math.h> /* ceil */
 
+#ifndef DEBUG
+#define DEBUG 0
+#endif /* DEBUG */
+
+#if DEBUG
+
+/* this is a debug assert. it will take no action on a non-debug build */
+#define ASSERT(condition) do { \
+	if (!condition) { \
+		fprintf(stderr, "%s: %s:%d: %s: Assertion `%s' failed.\n", \
+		    __BASE_FILE_,  __FILE__, __LINE__, __FUNCTION__, \
+		    #condition); \
+		abort(); \
+	} \
+} while(1)
+
+#define DEBUG_PRINT(message) do { \
+	fprintf(stderr, "DEBUG: %s:%d: %s: %s", __FILE__,  __LINE__, \
+	    __FUNCTION__, message); \
+} while(0)
+
+#define DEBUG_PRINTF(message, ...) do { \
+	fprintf(stderr, "DEBUG: %s:%d: %s: %s", __FILE__,  __LINE__, \
+	    __FUNCTION__, message, __VA_ARGS__); \
+} while(0)
+
+#define DEBUG_CALL(call) call
+#else /* DEBUG */
+#define ASSERT(condition) ((void) 0)
+#define DEBUG_PRINT(message) ((void) 0)
+#define DEBUG_PRINTF(message, ...) ((void) 0)
+#define DEBUG_CALL(call) ((void) 0)
+#endif /* DEBUG */
+
 #define DEFAULT_STACK_SIZE 10000
 
 /******************************************************************************/
@@ -488,7 +522,8 @@ graph_swap_nodes(graph_t *graph, int a, int b)
 	}
 }
 
-/* return an array how the nodes were swapped */
+/* return an array how the nodes were swapped,
+   this will change the graph! */
 static int *
 graph_domination_sort(graph_t *graph, int i_domination)
 {
@@ -507,7 +542,6 @@ graph_domination_sort(graph_t *graph, int i_domination)
 		fprintf(stderr, "trace mem\n");
 		exit(EXIT_FAILURE);
 	}
-
 
 	for (i = 0; i < graph->n; i++) {
 		nodes_domination[i] = graph_node_count_domination(graph, i,
@@ -549,6 +583,9 @@ static int
 is_solution(stack_item_t *item)
 {
 	int i;
+
+	DEBUG_PRINT("trying: ");
+	DEBUG_CALL(bit_array_print(item->solution));
 
 	for (i = 0; i < item->dominated_nodes->n; i++)
 		if (item->dominated_nodes->data[i] == 0)
@@ -629,7 +666,7 @@ solution_try_all(graph_t *graph, int i_domination)
 			continue;
 		}
 
-		if (is_solution(item)) {
+		if (item->level >= nodes_min && is_solution(item)) {
 			bit_array_copy(best_solution, item->solution);
 			/* actualize number of nodes for actual best solution */
 			best_solution_nodes = item->level;
