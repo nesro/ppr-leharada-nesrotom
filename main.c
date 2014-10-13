@@ -734,7 +734,7 @@ main(int argc, char *argv[])
 		graph_save(graph, arg_filename_out);
 
 		for (i = 0; i < graph->n; i++)
-			printf("%d", trace[i]);
+			printf("%d, ", trace[i]);
 		printf("\n");
 
 		free(trace);

@@ -1,4 +1,12 @@
+CFLAGS=-std=c99  -Wall -Werror -Wno-unused-function -pedantic
+CLIBS=-lm
+
+ifdef DEBUG
+	CFLAGS += -DDEBUG=1 -ggdb -O0
+else
+	CFLAGS += -Ofast
+endif
+
 all:
-	gcc -std=c99 -DDEBUG=1 -Wall -Werror -Wno-unused-function -pedantic \
--ggdb -O0 -o main main.c -lm
+	gcc  $(CFLAGS) -o main main.c $(CLIBS)
 
