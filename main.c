@@ -684,7 +684,7 @@ solution_try_all(graph_t *graph, int i_domination)
 		item->level++;
 
 		for (i = graph->n - 1; i >= 0; i--) {
-			if (item->solution->data[i] == 0) {
+			if (item->dominated_nodes->data[i] == 0) {
 				tmp_item = stack_item_clone(item);
 
 				tmp_item->solution->data[i] = 1;
