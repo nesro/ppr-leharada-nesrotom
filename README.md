@@ -20,12 +20,16 @@ https://edux.fit.cvut.cz/courses/MI-PPR.2/labs/prohledavani_do_hloubky#paralelni
 	user	0m0.061s
 	sys	0m0.008s
 
+![Alt text](images/graph5-dom3.png "Optional title")
+
 	n@t:~/Dropbox/github/ppr-leharada-nesrotom$ time ./main tests/5-graph-3-optimized.txt 3
 	01000000000000000000000000000000001
 
 	real	0m0.023s
 	user	0m0.023s
 	sys	0m0.000s
+
+![Alt text](images/graph5-dom3-optimized.png "Optional title")
 
 2-dom
 =====
@@ -37,12 +41,16 @@ https://edux.fit.cvut.cz/courses/MI-PPR.2/labs/prohledavani_do_hloubky#paralelni
 	user	0m3.206s
 	sys	0m0.000s
 
+![Alt text](images/graph5-dom2.png "Optional title")
+
 	n@t:~/Dropbox/github/ppr-leharada-nesrotom$ time ./main tests/5-graph-2-optimized.txt 2
 	11100000000000000000000000000000001
 
 	real	0m0.872s
 	user	0m0.873s
 	sys	0m0.000s
+
+![Alt text](images/graph5-dom2-optimized.png "Optional title")
 
 1-dom
 =====
