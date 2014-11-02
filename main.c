@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <limits.h> /* INT_MAX */
 #include <math.h> /* ceil */
+#include "mpi.h"
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -47,6 +48,10 @@
 #endif /* DEBUG */
 
 #define DEFAULT_STACK_SIZE 10000
+#define BUFFER_LENGTH 500
+#define MASTER_CPU 0
+#define TAG_STACK 0
+#define TAG_SOLUTION 1
 
 /******************************************************************************/
 /* structure definitions */
@@ -92,12 +97,12 @@ bit_array_init(int n)
 		exit(EXIT_FAILURE);
 	}
 
-	bit_array->n = n;
-
 	if ((bit_array->data = calloc(n, sizeof(char))) == NULL) {
 		fprintf(stderr, "calloc bit_array data has failed\n");
 		exit(EXIT_FAILURE);
 	}
+
+	bit_array->n = n;
 
 	return bit_array;
 }
@@ -141,6 +146,21 @@ bit_array_free(bit_array_t *bit_array)
 
 	free(bit_array->data);
 	free(bit_array);
+}
+
+static int
+bit_array_count_nodes(bit_array_t *bit_array)
+{
+    int i;
+    int counter = 0;
+
+	for(i = 0; i < bit_array->n; i++){
+        if(bit_array->data[i] == 1){
+            counter++;
+        }
+	}
+
+	return counter;
 }
 
 /******************************************************************************/
@@ -270,17 +290,18 @@ stack_push(stack_t *stack, stack_item_t *item)
 	stack->items_cnt++;
 }
 
-/* return 0 - OK, return 1 - too small stack */
-static int
-stack_divide(stack_t *stack, stack_item_t *item)
+static stack_item_t*
+stack_divide(stack_t *stack)
 {
+    stack_item_t* item;
+
 	if(stack->items_cnt - stack->bottom < 2){
-        return 1;
+        return NULL;
 	}
 
     item = stack_item_clone(stack->items[stack->bottom]);
     stack->bottom++;
-	return 0;
+	return item;
 }
 
 
@@ -638,9 +659,8 @@ add_dominated_nodes(graph_t *graph, int i_domination, int node_index,
 }
 
 static bit_array_t*
-solution_try_all(graph_t *graph, int i_domination)
+solution_try_all(graph_t *graph, stack_t *stack, int i_domination)
 {
-	stack_t *stack;
 	int i;
 	int diameter;
 	int nodes_min;
@@ -665,11 +685,10 @@ solution_try_all(graph_t *graph, int i_domination)
 	    graph->n));
 
 	best_solution = bit_array_init(graph->n);
-	best_solution_nodes = INT_MAX;
-
-	stack = stack_init();
-	item = stack_item_init(graph->n);
-	stack_push(stack, item);
+	for(i = 0; i < best_solution->n; i++){
+        best_solution->data[i] = 1;
+	}
+	best_solution_nodes = graph->n;
 
 	while (!stack_is_empty(stack)) {
 		item = stack_pop(stack);
@@ -714,9 +733,119 @@ solution_try_all(graph_t *graph, int i_domination)
 		stack_item_free(item);
 	}
 
-	stack_free(stack);
-
 	return best_solution;
+}
+
+static stack_t*
+init_master_cpu(graph_t *graph, int i_domination){
+    int i;
+    int cpu_count;
+    int pack_position;
+    char buffer[BUFFER_LENGTH];
+    stack_t *stack;
+    stack_item_t *item;
+    stack_item_t *tmp_item;
+
+    stack = stack_init();
+	item = stack_item_init(graph->n);
+
+	for (i = graph->n - 1; i >= 0; i--) {
+        tmp_item = stack_item_clone(item);
+
+		tmp_item->solution->data[i] = 1;
+		add_dominated_nodes(graph, i_domination, i,
+		    tmp_item->dominated_nodes);
+
+        stack_push(stack, tmp_item);
+    }
+
+    stack_item_free(item);
+
+    /* divide and send stack to all cpu */
+    /* find out number of processes */
+    MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
+
+    for(i = 1; i < cpu_count; i++){
+        item = stack_divide(stack);
+        if(item == NULL){
+            break;
+        }
+
+        pack_position = 0;
+        MPI_Pack(&item->level, 1, MPI_INT, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+        MPI_Pack(item->solution->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+        MPI_Pack(item->dominated_nodes->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+        MPI_Send (buffer, pack_position, MPI_PACKED, i, TAG_STACK, MPI_COMM_WORLD);
+
+        stack_item_free(item);
+    }
+
+	return stack;
+}
+
+static stack_t*
+init_slave_cpu(graph_t *graph){
+    int my_cpu_rank;
+    int pack_position;
+    char buffer[BUFFER_LENGTH];
+    MPI_Status status;
+    stack_t *stack;
+    stack_item_t *item;
+
+    stack = stack_init();
+
+    /* receive stack form master cpu */
+    /* find out process rank */
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
+
+    if(my_cpu_rank < graph->n){
+        item = stack_item_init(graph->n);
+
+        pack_position = 0;
+        MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, MASTER_CPU, TAG_STACK, MPI_COMM_WORLD, &status);
+        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, &item->level, 1, MPI_INT, MPI_COMM_WORLD);
+        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->solution->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
+        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->dominated_nodes->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
+
+        stack_push(stack, item);
+    }
+
+	return stack;
+}
+
+static void
+best_solution_send(bit_array_t *solution){
+    MPI_Send(solution->data, solution->n, MPI_CHAR, MASTER_CPU, TAG_SOLUTION, MPI_COMM_WORLD);
+}
+
+static bit_array_t*
+best_solution_receive(bit_array_t *solution){
+    bit_array_t *receive_solution;
+    bit_array_t *best_solution;
+    int cpu_count;
+    int i;
+    MPI_Status status;
+
+    best_solution = bit_array_clone(solution);
+
+    /* find out number of processes */
+    MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
+
+    for(i = 1; i < cpu_count; i++){
+        receive_solution = bit_array_init(solution->n);
+        MPI_Recv(receive_solution->data, receive_solution->n, MPI_CHAR, i, TAG_SOLUTION, MPI_COMM_WORLD, &status);
+
+        if(bit_array_count_nodes(best_solution) > bit_array_count_nodes(receive_solution)){
+            bit_array_free(best_solution);
+            best_solution = bit_array_clone(receive_solution);
+        }
+
+        bit_array_free(receive_solution);
+    }
+
+    bit_array_free(solution);
+
+    return best_solution;
 }
 
 /******************************************************************************/
@@ -735,7 +864,9 @@ main(int argc, char *argv[])
 	const char *arg_filename_out;
 	int *trace;
 	int i;
+	int my_cpu_rank;
 	bit_array_t *solution = NULL;
+	stack_t *stack;
 
 	/* ./main --optimize i-dominaton input.txt output.txt */
 	if (argc == 5 && !strcmp(argv[1], "--optimize")) {
@@ -785,11 +916,31 @@ main(int argc, char *argv[])
 
 	graph = graph_load(argv[1]);
 
-	solution = solution_try_all(graph, i_domination);
-	bit_array_print(solution);
+	/* start up MPI */
+    MPI_Init( &argc, &argv );
+    /* find out process rank */
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
+
+    if(my_cpu_rank == MASTER_CPU){
+        stack = init_master_cpu(graph, i_domination);
+        solution = solution_try_all(graph, stack, i_domination);
+        solution = best_solution_receive(solution);
+
+        printf("%d ", bit_array_count_nodes(solution));
+        bit_array_print(solution);
+    }
+    else{
+        stack = init_slave_cpu(graph);
+        solution = solution_try_all(graph, stack, i_domination);
+        best_solution_send(solution);
+    }
+
+	/* shut down MPI */
+    MPI_Finalize();
 
 	graph_free(graph);
 	bit_array_free(solution);
+	stack_free(stack);
 
 	return EXIT_SUCCESS;
 }

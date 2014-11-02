@@ -8,5 +8,5 @@ else
 endif
 
 all:
-	gcc  $(CFLAGS) -o main main.c $(CLIBS)
+	mpicc  $(CFLAGS) -o main main.c $(CLIBS)
 
