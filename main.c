@@ -71,6 +71,7 @@ typedef struct stack_item {
 } stack_item_t;
 
 typedef struct stack {
+    int bottom;
 	int size;
 	int items_cnt;
 	stack_item_t **items; /* array of pointers */
@@ -211,6 +212,7 @@ stack_init(void)
 
 	stack->size = DEFAULT_STACK_SIZE;
 	stack->items_cnt = 0;
+	stack->bottom = 0;
 
 	return stack;
 }
@@ -220,13 +222,13 @@ stack_is_empty(stack_t *stack)
 {
 	assert(stack != NULL);
 
-	return (stack->items_cnt == 0);
+	return (stack->items_cnt - stack->bottom == 0);
 }
 
 static stack_item_t *
 stack_pop(stack_t *stack)
 {
-	assert(stack->items_cnt > 0);
+	assert(stack->items_cnt - stack->bottom > 0);
 
 	stack->items_cnt--;
 	return stack->items[stack->items_cnt];
@@ -260,11 +262,25 @@ stack_push(stack_t *stack, stack_item_t *item)
 			exit(EXIT_FAILURE);
 		}
 
+        /* TODO: remove items under the bottom of stack */
 		stack->items = tmp_items;
 	}
 
 	stack->items[stack->items_cnt] = item;
 	stack->items_cnt++;
+}
+
+/* return 0 - OK, return 1 - too small stack */
+static int
+stack_divide(stack_t *stack, stack_item_t *item)
+{
+	if(stack->items_cnt - stack->bottom < 2){
+        return 1;
+	}
+
+    item = stack_item_clone(stack->items[stack->bottom]);
+    stack->bottom++;
+	return 0;
 }
 
 
