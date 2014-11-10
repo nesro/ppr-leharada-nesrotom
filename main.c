@@ -818,34 +818,34 @@ best_solution_send(bit_array_t *solution){
     MPI_Send(solution->data, solution->n, MPI_CHAR, MASTER_CPU, TAG_SOLUTION, MPI_COMM_WORLD);
 }
 
-static bit_array_t*
-best_solution_receive(bit_array_t *solution){
+static int
+best_solution_receive(bit_array_t **solution){
     bit_array_t *receive_solution;
-    bit_array_t *best_solution;
     int cpu_count;
     int i;
     MPI_Status status;
+	int receive_solution_nodes;
+	int best_solution_nodes;
 
-    best_solution = bit_array_clone(solution);
+	best_solution_nodes = bit_array_count_nodes(*solution);
+        receive_solution = bit_array_init((*solution)->n);
 
     /* find out number of processes */
     MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
 
     for(i = 1; i < cpu_count; i++){
-        receive_solution = bit_array_init(solution->n);
         MPI_Recv(receive_solution->data, receive_solution->n, MPI_CHAR, i, TAG_SOLUTION, MPI_COMM_WORLD, &status);
 
-        if(bit_array_count_nodes(best_solution) > bit_array_count_nodes(receive_solution)){
-            bit_array_free(best_solution);
-            best_solution = bit_array_clone(receive_solution);
+	receive_solution_nodes = bit_array_count_nodes(receive_solution);
+        if(best_solution_nodes > receive_solution_nodes){
+	    bit_array_copy(*solution, receive_solution);
+	    best_solution_nodes = receive_solution_nodes;
         }
-
-        bit_array_free(receive_solution);
     }
 
-    bit_array_free(solution);
+    bit_array_free(receive_solution);
 
-    return best_solution;
+	return (best_solution_nodes);
 }
 
 /******************************************************************************/
@@ -924,9 +924,8 @@ main(int argc, char *argv[])
     if(my_cpu_rank == MASTER_CPU){
         stack = init_master_cpu(graph, i_domination);
         solution = solution_try_all(graph, stack, i_domination);
-        solution = best_solution_receive(solution);
 
-        printf("%d ", bit_array_count_nodes(solution));
+        printf("%d ", best_solution_receive(&solution));
         bit_array_print(solution);
     }
     else{
