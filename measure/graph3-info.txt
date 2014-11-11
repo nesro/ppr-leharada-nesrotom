@@ -1,0 +1,3 @@
+nodes 50
+avg. degree 3
+i-dom 2
