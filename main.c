@@ -300,6 +300,7 @@ stack_divide(stack_t *stack)
 	}
 
     item = stack_item_clone(stack->items[stack->bottom]);
+    stack_item_free(stack->items[stack->bottom]);
     stack->bottom++;
 	return item;
 }
