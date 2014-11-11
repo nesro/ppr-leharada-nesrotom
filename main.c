@@ -76,7 +76,7 @@ typedef struct stack_item {
 } stack_item_t;
 
 typedef struct stack {
-    int bottom;
+	int bottom;
 	int size;
 	int items_cnt;
 	stack_item_t **items; /* array of pointers */
@@ -151,13 +151,13 @@ bit_array_free(bit_array_t *bit_array)
 static int
 bit_array_count_nodes(bit_array_t *bit_array)
 {
-    int i;
-    int counter = 0;
+	int i;
+	int counter = 0;
 
 	for(i = 0; i < bit_array->n; i++){
-        if(bit_array->data[i] == 1){
-            counter++;
-        }
+		if(bit_array->data[i] == 1){
+			counter++;
+		}
 	}
 
 	return counter;
@@ -282,7 +282,7 @@ stack_push(stack_t *stack, stack_item_t *item)
 			exit(EXIT_FAILURE);
 		}
 
-        /* TODO: remove items under the bottom of stack */
+		/* TODO: remove items under the bottom of stack */
 		stack->items = tmp_items;
 	}
 
@@ -293,15 +293,15 @@ stack_push(stack_t *stack, stack_item_t *item)
 static stack_item_t*
 stack_divide(stack_t *stack)
 {
-    stack_item_t* item;
+	stack_item_t* item;
 
 	if(stack->items_cnt - stack->bottom < 2){
-        return NULL;
+		return NULL;
 	}
 
-    item = stack_item_clone(stack->items[stack->bottom]);
-    stack_item_free(stack->items[stack->bottom]);
-    stack->bottom++;
+	item = stack_item_clone(stack->items[stack->bottom]);
+	stack_item_free(stack->items[stack->bottom]);
+	stack->bottom++;
 	return item;
 }
 
@@ -479,40 +479,40 @@ graph_diameter(graph_t *graph)
 
 	/* initialize distances matrix*/
 	for (i = 0; i < graph->n; i++) {
-	for (j = 0; j < graph->n; j++) {
-		if (i == j) {
-			distances[i][j] = 0;
-		} else if (graph->am[i][j] == 1) {
-			distances[i][j] = 1;
-		} else {
-			distances[i][j] = INT_MAX;
+		for (j = 0; j < graph->n; j++) {
+			if (i == j) {
+				distances[i][j] = 0;
+			} else if (graph->am[i][j] == 1) {
+				distances[i][j] = 1;
+			} else {
+				distances[i][j] = INT_MAX;
+			}
 		}
-	}
 	}
 
 	/* compute matrix of distances */
 	for (i = 0; i < graph->n; i++) {
-	for (j = 0; j < graph->n; j++) {
-	for (k = 0; k < graph->n; k++) {
-		/* test to infinity because it can overflow */
-		if(distances[j][k] > distances[j][i] + distances[i][k] &&
-		    distances[j][i] != INT_MAX &&
-		    distances[i][k] != INT_MAX) {
-			distances[j][k] = distances[j][i] + distances[i][k];
+		for (j = 0; j < graph->n; j++) {
+			for (k = 0; k < graph->n; k++) {
+				/* test to infinity because it can overflow */
+				if(distances[j][k] > distances[j][i] + distances[i][k] &&
+				    distances[j][i] != INT_MAX &&
+				    distances[i][k] != INT_MAX) {
+					distances[j][k] = distances[j][i] + distances[i][k];
+				}
+			}
 		}
-	}
-	}
 	}
 
 	/* choose graph diamener, maximum non infinite number in distances
 	   matrix */
 	max = 0;
 	for (i = 0; i < graph->n; i++) {
-	for (j = 0; j < graph->n; j++) {
-		if (distances[i][j] > max && distances[i][j] < INT_MAX) {
-			max = distances[i][j];
+		for (j = 0; j < graph->n; j++) {
+			if (distances[i][j] > max && distances[i][j] < INT_MAX) {
+				max = distances[i][j];
+			}
 		}
-	}
 	}
 
 	/* free allocated space */
@@ -687,7 +687,7 @@ solution_try_all(graph_t *graph, stack_t *stack, int i_domination)
 
 	best_solution = bit_array_init(graph->n);
 	for(i = 0; i < best_solution->n; i++){
-        best_solution->data[i] = 1;
+		best_solution->data[i] = 1;
 	}
 	best_solution_nodes = graph->n;
 
@@ -739,112 +739,112 @@ solution_try_all(graph_t *graph, stack_t *stack, int i_domination)
 
 static stack_t*
 init_master_cpu(graph_t *graph, int i_domination){
-    int i;
-    int cpu_count;
-    int pack_position;
-    char buffer[BUFFER_LENGTH];
-    stack_t *stack;
-    stack_item_t *item;
-    stack_item_t *tmp_item;
+	int i;
+	int cpu_count;
+	int pack_position;
+	char buffer[BUFFER_LENGTH];
+	stack_t *stack;
+	stack_item_t *item;
+	stack_item_t *tmp_item;
 
-    stack = stack_init();
+	stack = stack_init();
 	item = stack_item_init(graph->n);
 
 	for (i = graph->n - 1; i >= 0; i--) {
-        tmp_item = stack_item_clone(item);
+		tmp_item = stack_item_clone(item);
 
 		tmp_item->solution->data[i] = 1;
 		add_dominated_nodes(graph, i_domination, i,
 		    tmp_item->dominated_nodes);
 
-        stack_push(stack, tmp_item);
-    }
+		stack_push(stack, tmp_item);
+	}
 
-    stack_item_free(item);
+	stack_item_free(item);
 
-    /* divide and send stack to all cpu */
-    /* find out number of processes */
-    MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
+	/* divide and send stack to all cpu */
+	/* find out number of processes */
+	MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
 
-    for(i = 1; i < cpu_count; i++){
-        item = stack_divide(stack);
-        if(item == NULL){
-            break;
-        }
+	for(i = 1; i < cpu_count; i++){
+		item = stack_divide(stack);
+		if(item == NULL){
+			break;
+		}PI_CH
 
-        pack_position = 0;
-        MPI_Pack(&item->level, 1, MPI_INT, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
-        MPI_Pack(item->solution->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
-        MPI_Pack(item->dominated_nodes->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
-        MPI_Send (buffer, pack_position, MPI_PACKED, i, TAG_STACK, MPI_COMM_WORLD);
+		pack_position = 0;
+		MPI_Pack(&item->level, 1, MPI_INT, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+		MPI_Pack(item->solution->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+		MPI_Pack(item->dominated_nodes->data, graph->n, MPI_CHAR, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+		MPI_Send (buffer, pack_position, MPI_PACKED, i, TAG_STACK, MPI_COMM_WORLD);
 
-        stack_item_free(item);
-    }
+		stack_item_free(item);
+	}
 
 	return stack;
 }
 
 static stack_t*
 init_slave_cpu(graph_t *graph){
-    int my_cpu_rank;
-    int pack_position;
-    char buffer[BUFFER_LENGTH];
-    MPI_Status status;
-    stack_t *stack;
-    stack_item_t *item;
+	int my_cpu_rank;
+	int pack_position;
+	char buffer[BUFFER_LENGTH];
+	MPI_Status status;
+	stack_t *stack;
+	stack_item_t *item;
 
-    stack = stack_init();
+	stack = stack_init();
 
-    /* receive stack form master cpu */
-    /* find out process rank */
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
+	/* receive stack form master cpu */
+	/* find out process rank */
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
 
-    if(my_cpu_rank < graph->n){
-        item = stack_item_init(graph->n);
+	if(my_cpu_rank < graph->n){
+		item = stack_item_init(graph->n);
 
-        pack_position = 0;
-        MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, MASTER_CPU, TAG_STACK, MPI_COMM_WORLD, &status);
-        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, &item->level, 1, MPI_INT, MPI_COMM_WORLD);
-        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->solution->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
-        MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->dominated_nodes->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
+		pack_position = 0;
+		MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, MASTER_CPU, TAG_STACK, MPI_COMM_WORLD, &status);
+		MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, &item->level, 1, MPI_INT, MPI_COMM_WORLD);
+		MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->solution->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
+		MPI_Unpack(buffer, BUFFER_LENGTH, &pack_position, item->dominated_nodes->data, graph->n, MPI_CHAR, MPI_COMM_WORLD);
 
-        stack_push(stack, item);
-    }
+		stack_push(stack, item);
+	}
 
 	return stack;
 }
 
 static void
 best_solution_send(bit_array_t *solution){
-    MPI_Send(solution->data, solution->n, MPI_CHAR, MASTER_CPU, TAG_SOLUTION, MPI_COMM_WORLD);
+	MPI_Send(solution->data, solution->n, MPI_CHAR, MASTER_CPU, TAG_SOLUTION, MPI_COMM_WORLD);
 }
 
 static int
 best_solution_receive(bit_array_t **solution){
-    bit_array_t *receive_solution;
-    int cpu_count;
-    int i;
-    MPI_Status status;
+	bit_array_t *receive_solution;
+	int cpu_count;
+	int i;
+	MPI_Status status;
 	int receive_solution_nodes;
 	int best_solution_nodes;
 
 	best_solution_nodes = bit_array_count_nodes(*solution);
-        receive_solution = bit_array_init((*solution)->n);
+	receive_solution = bit_array_init((*solution)->n);
 
-    /* find out number of processes */
-    MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
+	/* find out number of processes */
+	MPI_Comm_size(MPI_COMM_WORLD, &cpu_count);
 
-    for(i = 1; i < cpu_count; i++){
-        MPI_Recv(receive_solution->data, receive_solution->n, MPI_CHAR, i, TAG_SOLUTION, MPI_COMM_WORLD, &status);
+	for(i = 1; i < cpu_count; i++){
+		MPI_Recv(receive_solution->data, receive_solution->n, MPI_CHAR, i, TAG_SOLUTION, MPI_COMM_WORLD, &status);
 
-	receive_solution_nodes = bit_array_count_nodes(receive_solution);
-        if(best_solution_nodes > receive_solution_nodes){
-	    bit_array_copy(*solution, receive_solution);
-	    best_solution_nodes = receive_solution_nodes;
-        }
-    }
+		receive_solution_nodes = bit_array_count_nodes(receive_solution);
+		if(best_solution_nodes > receive_solution_nodes){
+			bit_array_copy(*solution, receive_solution);
+			best_solution_nodes = receive_solution_nodes;
+		}
+	}
 
-    bit_array_free(receive_solution);
+	bit_array_free(receive_solution);
 
 	return (best_solution_nodes);
 }
@@ -918,25 +918,25 @@ main(int argc, char *argv[])
 	graph = graph_load(argv[1]);
 
 	/* start up MPI */
-    MPI_Init( &argc, &argv );
-    /* find out process rank */
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
+	MPI_Init( &argc, &argv );
+	/* find out process rank */
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_cpu_rank);
 
-    if(my_cpu_rank == MASTER_CPU){
-        stack = init_master_cpu(graph, i_domination);
-        solution = solution_try_all(graph, stack, i_domination);
+	if(my_cpu_rank == MASTER_CPU){
+		stack = init_master_cpu(graph, i_domination);
+		solution = solution_try_all(graph, stack, i_domination);
 
-        printf("%d ", best_solution_receive(&solution));
-        bit_array_print(solution);
-    }
-    else{
-        stack = init_slave_cpu(graph);
-        solution = solution_try_all(graph, stack, i_domination);
-        best_solution_send(solution);
-    }
+		printf("%d ", best_solution_receive(&solution));
+		bit_array_print(solution);
+	}
+	else{
+		stack = init_slave_cpu(graph);
+		solution = solution_try_all(graph, stack, i_domination);
+		best_solution_send(solution);
+	}
 
 	/* shut down MPI */
-    MPI_Finalize();
+	MPI_Finalize();
 
 	graph_free(graph);
 	bit_array_free(solution);
