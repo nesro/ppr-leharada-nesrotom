@@ -1,0 +1,5 @@
+graphX.txt - graf vygenerovaný generátorem
+graphXs.txt - graf upravený na souvislý
+graphXo.txt - graf optimalizovaný naším algoritmem
+graphX-info.txt - informace o grafu
+graphX-res.txt - výsledek sekvenčního běhu
