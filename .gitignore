@@ -32,3 +32,4 @@ main
 #vim swap file
 *.swp
 
+build
