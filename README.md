@@ -4,11 +4,11 @@ ppr-leharada-nesrotom
 jak mi to bezi
 ==============
 
-n@t:~/Dropbox/github/ppr-leharada-nesrotom$ mpiexec -np 2 ./main --mpi ./tests/3-graph.txt 1
-I, 0,  did 30 work
-I, 1,  did 6 work
-XXXXXXXXXXXXXXXXXXX
-RESULT: 2 100100
+	n@t:~/Dropbox/github/ppr-leharada-nesrotom$ mpiexec -np 2 ./main --mpi ./tests/3-graph.txt 1
+	I, 0,  did 30 work
+	I, 1,  did 6 work
+	XXXXXXXXXXXXXXXXXXX
+	RESULT: 2 100100
 
 
 poznamky co se melo udelat ale neco z toho uz je
