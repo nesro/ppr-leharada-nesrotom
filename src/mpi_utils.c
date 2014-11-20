@@ -14,6 +14,9 @@
 #include "problem.h"
 #include "mpi_utils.h"
 
+char *g_mpi_tags[] = { "STACK", "BEST_NODES", "SOLUTION", "TOKEN",
+	"NEED_JOB", "NO_JOB", "FINALIZE", "FINALIZE_OK", "INIT_STACK" };
+
 void
 mpi_send_best_solution_nodes(problem_t *problem)
 {
@@ -23,6 +26,7 @@ mpi_send_best_solution_nodes(problem_t *problem)
 		if (i == problem->mpi_rank)
 			continue;
 
+		mpi_printf(problem, "MPI_Send cpu=%d BEST_NODES\n", i);
 		MPI_Send(&problem->best_solution_nodes, 1, MPI_INT, i,
 		    TAG_BEST_NODES, MPI_COMM_WORLD);
 	}
@@ -71,6 +75,8 @@ mpi_send_need_job(problem_t *problem)
 {
 	mpi_printf(problem, "I'm asking for a job.\n");
 
+	mpi_printf(problem, "MPI_Send cpu=%d NEED_JOB\n",
+	    problem->mpi_cpu_to_ask);
 	MPI_Send(NULL, 0, MPI_CHAR, problem->mpi_cpu_to_ask, TAG_NEED_JOB,
 	    MPI_COMM_WORLD);
 
@@ -95,6 +101,7 @@ mpi_send_master_finalize(problem_t *problem)
 
 	/* send broadcast with TAG_FINALIZE */
 	for (i = 1; i < problem->mpi_cpus; i++) {
+		mpi_printf(problem, "MPI_Send cpu=%d FINALIZE\n", i);
 		MPI_Send(NULL, 0, MPI_CHAR, i, TAG_FINALIZE, MPI_COMM_WORLD);
 	}
 
@@ -123,6 +130,7 @@ mpi_handle_token(problem_t *problem)
 		problem->master_token_dispatched = TRUE;
 		problem->token_dirty = TOKEN_CLEAN;
 
+		mpi_printf(problem, "MPI_Send cpu=%d TOKEN\n", 1);
 		MPI_Send(&problem->token_dirty, 1, MPI_INT, 1, TAG_TOKEN,
 		    MPI_COMM_WORLD);
 
@@ -147,6 +155,8 @@ mpi_handle_token(problem_t *problem)
 			problem->token = TOKEN_DIRTY;
 		}
 
+		mpi_printf(problem, "MPI_Send cpu=%d TOKEN\n",
+		    ((problem->mpi_rank + 1) % problem->mpi_cpus));
 		MPI_Send(&problem->token, 1, MPI_CHAR,
 		    ((problem->mpi_rank + 1) % problem->mpi_cpus), TAG_TOKEN,
 		    MPI_COMM_WORLD);
@@ -190,7 +200,7 @@ mpi_recv_need_job(problem_t *problem)
 	    &problem->status);
 
 	if (stack_is_empty(problem->stack)) {
-		mpi_printf(problem, "hey %d, i have no job\n",
+		mpi_printf(problem, "MPI_Send cpu=%d NO_JOB\n",
 		    problem->status.MPI_SOURCE);
 		MPI_Send(NULL, 0, MPI_CHAR, problem->status.MPI_SOURCE,
 		    TAG_NO_JOB, MPI_COMM_WORLD);
@@ -221,6 +231,8 @@ mpi_recv_need_job(problem_t *problem)
 		stack_item_free(item);
 	}
 
+	mpi_printf(problem, "MPI_Send cpu=%d STACK\n",
+	    problem->status.MPI_SOURCE);
 	MPI_Send(problem->buffer, pack_position, MPI_PACKED,
 	    problem->status.MPI_SOURCE, TAG_STACK, MPI_COMM_WORLD);
 }
@@ -250,9 +262,12 @@ mpi_recv_finalize(problem_t *problem)
 	    &problem->status);
 
 	if (problem->best_solution_i_computed_it) {
+		mpi_printf(problem, "MPI_Send cpu=%d SOLUTION\n", MASTER_CPU);
 		MPI_Send(problem->best_solution->data, problem->graph->n,
 		    MPI_CHAR, MASTER_CPU, TAG_SOLUTION, MPI_COMM_WORLD);
 	} else {
+		mpi_printf(problem, "MPI_Send cpu=%d FINALIZE_OK\n",
+		    MASTER_CPU);
 		MPI_Send(NULL, 0, MPI_CHAR, MASTER_CPU, TAG_FINALIZE_OK,
 		    MPI_COMM_WORLD);
 	}
@@ -272,7 +287,8 @@ mpi_recv(problem_t *problem)
 		if (!flag)
 			return;
 
-		mpi_printf(problem, "Iprobe tag=%d from=%d\n",
+		mpi_printf(problem, "Iprobe tag=%s(%d) from=%d\n",
+		    g_mpi_tags[problem->status.MPI_TAG],
 		    problem->status.MPI_TAG, problem->status.MPI_SOURCE);
 
 		switch (problem->status.MPI_TAG) {
@@ -349,6 +365,7 @@ mpi_init_master_cpu(problem_t *problem)
 		MPI_Pack(item->dominated_nodes->data, problem->graph->n,
 		    MPI_CHAR, problem->buffer, BUFFER_LENGTH, &pack_position,
 		    MPI_COMM_WORLD);
+		mpi_printf(problem, "MPI_Send cpu=%d INIT_STACK\n", i);
 		MPI_Send(problem->buffer, pack_position, MPI_PACKED, i,
 		    TAG_INIT_STACK, MPI_COMM_WORLD);
 

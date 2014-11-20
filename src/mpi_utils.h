@@ -11,7 +11,6 @@
 #define TAG_CNT 4
 
 #define TAG_STACK 0 /* sending part of stack */
-#define TAG_INIT_STACK 7 /* sending the initial work. i.e. one item */
 #define TAG_BEST_NODES 1 /* sending number of nodes in best soution */
 #define TAG_SOLUTION 2 /* sending nodes of the best solution */
 #define TAG_TOKEN 3 /* sedning token */
@@ -19,6 +18,8 @@
 #define TAG_NO_JOB 5 /* we were asked for job but we don't have any */
 #define TAG_FINALIZE 6 /* master received clean token and is sending info */
 #define TAG_FINALIZE_OK 7 /* we received ^ and don't have the best solution */
+#define TAG_INIT_STACK 8 /* sending the initial work. i.e. one item */
+
 
 #define PROCCESSORS_MAX 12
 
@@ -31,6 +32,7 @@
 
 #define DEFAULT_STACK_SIZE 10000
 #define BUFFER_LENGTH 900
+
 
 void mpi_send_best_solution_nodes(problem_t *problem);
 void mpi_recv_stack(problem_t *problem);
