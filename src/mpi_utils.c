@@ -425,6 +425,7 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 			problem_stack_expand(problem, item);
 
 		if (item != NULL) {
+			problem->computed_items++;
 			mpi_printf(problem, "tried item: ");
 #if DEBUG
 			bit_array_print(item->solution);
@@ -458,6 +459,11 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 	mpi_printf(problem, "Finalize! Total time=%lf\n",
 	    time_finalize - time_init);
 	MPI_Finalize();
+
+
+	sleep(2);
+	printf("I, %d,  did %d work\n", problem->mpi_rank,
+	    problem->computed_items);
 
 	if (problem->mpi_rank == MASTER_CPU) {
 		/* aby byl vystup na konci, tak se prospime */

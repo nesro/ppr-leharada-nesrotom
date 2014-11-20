@@ -22,6 +22,9 @@ typedef struct problem {
 	bool_t finalize;
 
 
+	/* we need to have a nice summary, how much work the cpus did */
+	int computed_items;
+
 	/* token have is true if we have him and its set right.
 	 * when we send the token, we set token_have to false */
 	bool_t token_have;
