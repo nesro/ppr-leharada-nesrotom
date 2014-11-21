@@ -251,13 +251,18 @@ mpi_recv_need_job(problem_t *problem)
 void
 mpi_recv_best_nodes(problem_t *problem)
 {
-	MPI_Recv(&problem->best_solution_nodes, 1, MPI_INT, MPI_ANY_SOURCE,
+	int best_nodes_recv;
+	MPI_Recv(&best_nodes_recv, 1, MPI_INT, MPI_ANY_SOURCE,
 	    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
 
-	problem->best_solution_i_computed_it = FALSE;
+	mpi_printf(problem, "got best nodes %d from %d, i have %d\n",
+	    problem->best_solution_nodes, problem->status.MPI_SOURCE,
+	    problem->best_solution_nodes);
 
-	mpi_printf(problem, "got best nodes %d from %d\n",
-	    problem->best_solution_nodes, problem->status.MPI_SOURCE);
+	if (best_nodes_recv < problem->best_solution_nodes) {
+		problem->best_solution_nodes = best_nodes_recv;
+		problem->best_solution_i_computed_it = FALSE;
+	}
 }
 
 void
