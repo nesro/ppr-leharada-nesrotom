@@ -136,7 +136,7 @@ problem_stack_expand(problem_t *problem, stack_item_t *item)
 
 	item->level++;
 
-	if (item->level >= problem->nodes_max)
+	if (item->level > problem->nodes_max)
 		return;
 
 	for (i = problem->graph->n - 1; i >= 0; i--) {

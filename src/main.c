@@ -22,7 +22,32 @@
 #include "mpi_utils.h"
 
 /******************************************************************************/
+static void
+add_dominated_nodes_rec(graph_t *graph, int level, int actual_node,
+    int last_node, bit_array_t *dominated_nodes)
+{
+	int i;
 
+	if (level == 0)
+		return;
+
+	for (i = 0; i < graph->n; i++) {
+		if (graph->am[actual_node][i] == 1 && i != last_node) {
+			dominated_nodes->data[i] = 1;
+			add_dominated_nodes_rec(graph, level - 1, i,
+			    actual_node, dominated_nodes);
+		}
+	}
+}
+
+static void
+add_dominated_nodes(graph_t *graph, int i_domination, int node_index,
+    bit_array_t *dominated_nodes)
+{
+	dominated_nodes->data[node_index] = 1;
+	add_dominated_nodes_rec(graph, i_domination, node_index, -1,
+	    dominated_nodes);
+}
 int
 main_seq(const char *graph_filename, int i_domination)
 {
@@ -35,13 +60,30 @@ main_seq(const char *graph_filename, int i_domination)
 	stack_push(problem->stack, item);
 
 	while ((item = stack_pop(problem->stack))) {
-		if (!problem_is_solution(problem, item))
-			problem_stack_expand(problem, item);
+		problem->computed_items++;
 
+		if (item->level >= problem->best_solution_nodes ||
+		    item->level > problem->nodes_max) {
+			stack_item_free(item);
+			continue;
+		}
+
+		if (problem_is_solution(problem, item)) {
+			if (item->level <= problem->nodes_min) {
+				stack_item_free(item);
+				break;
+			}
+
+			stack_item_free(item);
+			continue;
+		}
+
+		problem_stack_expand(problem, item);
 		stack_item_free(item);
 	}
 
-	printf("RESULT: %d ", problem->best_solution_nodes);
+	printf("ci=%d RESULT: %d ", problem->computed_items,
+	    problem->best_solution_nodes);
 	bit_array_print(problem->best_solution);
 
 	problem_free(problem);

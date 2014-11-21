@@ -58,8 +58,8 @@ typedef struct stack_item {
 
 typedef struct stack {
 	int bottom;
+	int top;
 	int size;
-	int items_cnt;
 	stack_item_t **items; /* array of pointers */
 } stack_t;
 
@@ -79,5 +79,8 @@ stack_item_t *stack_pop(stack_t *stack);
 void stack_free(stack_t *stack);
 void stack_push(stack_t *stack, stack_item_t *item);
 stack_item_t *stack_divide(stack_t *stack);
+void stack_delete_items(stack_t *stack);
+int stack_items(stack_t *stack);
+void stack_delete_items(stack_t *stack);
 
 #endif /* UTILS_H */

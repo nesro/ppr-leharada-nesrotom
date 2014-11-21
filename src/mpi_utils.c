@@ -59,7 +59,7 @@ mpi_recv_stack(problem_t *problem)
 		    MPI_COMM_WORLD);
 		MPI_Unpack(problem->buffer, BUFFER_LENGTH, &pack_position,
 		    &item->level, 1, MPI_INT, MPI_COMM_WORLD);
-		
+
 		stack_push(problem->stack, item);
 	}
 }
@@ -110,8 +110,8 @@ mpi_send_master_finalize(problem_t *problem)
 		mpi_recv(problem);
 
 	/* ted bysme uz meli mit nejlepsi reseni . nee, to  bude pred finalize
-	mpi_printf(problem, "MASTER RESULT %d ", problem->best_solution_nodes);
-	bit_array_print(problem->best_solution);*/
+	   mpi_printf(problem, "MASTER RESULT %d ", problem->best_solution_nodes);
+	   bit_array_print(problem->best_solution);*/
 
 	/* ted muzeme ukoncit i mastera */
 	problem->finalize = TRUE;
@@ -130,7 +130,7 @@ mpi_handle_token(problem_t *problem)
 		problem->master_token_dispatched = TRUE;
 		problem->token_dirty = TOKEN_CLEAN;
 
-		mpi_printf(problem, "MPI_Send cpu=%d TOKEN\n", 1);
+		mpi_printf(problem, "MPI_Send cpu=%d FIRST TOKEN\n", 1);
 		MPI_Send(&problem->token_dirty, 1, MPI_INT, 1, TAG_TOKEN,
 		    MPI_COMM_WORLD);
 
@@ -144,24 +144,18 @@ mpi_handle_token(problem_t *problem)
 	 * svoji spinavost. po odeslani peska se ale my ocistime */
 	if (stack_is_empty(problem->stack)) {
 
-		/* master cpu se vratil token, vypocet by mel skoncit */
-		if (problem->mpi_rank == MASTER_CPU &&
-		    problem->token == TOKEN_CLEAN) {
-			mpi_send_master_finalize(problem);
-		}
+		if (problem->token_dirty == TOKEN_CLEAN)
+			problem->token = TOKEN_CLEAN;
 
-		if (problem->token == TOKEN_CLEAN &&
-		    problem->token_dirty == TOKEN_DIRTY) {
-			problem->token = TOKEN_DIRTY;
-		}
-
-		mpi_printf(problem, "MPI_Send cpu=%d TOKEN\n",
-		    ((problem->mpi_rank + 1) % problem->mpi_cpus));
+		mpi_printf(problem, "MPI_Send cpu=%d TOKEN dirty=%d\n",
+		    ((problem->mpi_rank + 1) % problem->mpi_cpus),
+		    problem->token);
 		MPI_Send(&problem->token, 1, MPI_CHAR,
 		    ((problem->mpi_rank + 1) % problem->mpi_cpus), TAG_TOKEN,
 		    MPI_COMM_WORLD);
 
 		problem->token_dirty = TOKEN_CLEAN;
+		problem->token = TOKEN_CLEAN;
 		problem->token_have = FALSE;
 	}
 }
@@ -171,8 +165,16 @@ mpi_recv_token(problem_t *problem)
 {
 	MPI_Recv(&problem->token, 1, MPI_INT, problem->status.MPI_SOURCE,
 	    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
+	mpi_printf(problem, "MPI_Recv from=%d TOKEN dirty=%d\n",
+	    problem->status.MPI_SOURCE, problem->token);
 
 	problem->token_have = TRUE;
+
+	if (problem->mpi_rank == MASTER_CPU && problem->token == TOKEN_CLEAN) {
+		mpi_printf(problem, "FINALIZE mpi_send_master_finalize\n");
+		mpi_send_master_finalize(problem);
+	}
+
 }
 
 /******************************************************************************/
@@ -180,7 +182,7 @@ mpi_recv_token(problem_t *problem)
 void
 mpi_send(problem_t *problem)
 {
-	if (stack_is_empty(problem->stack))
+	if (stack_is_empty(problem->stack) && !problem->mpi_waiting_for_no_job)
 		mpi_send_need_job(problem);
 
 	mpi_handle_token(problem);
@@ -191,7 +193,7 @@ mpi_send(problem_t *problem)
 void
 mpi_recv_need_job(problem_t *problem)
 {
-	int stack_items;
+	int items_to_send;
 	int pack_position;
 	int i;
 	stack_item_t *item;
@@ -199,7 +201,7 @@ mpi_recv_need_job(problem_t *problem)
 	MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
 	    &problem->status);
 
-	if (stack_is_empty(problem->stack)) {
+	if (stack_items(problem->stack) < 5) {
 		mpi_printf(problem, "MPI_Send cpu=%d NO_JOB\n",
 		    problem->status.MPI_SOURCE);
 		MPI_Send(NULL, 0, MPI_CHAR, problem->status.MPI_SOURCE,
@@ -209,15 +211,24 @@ mpi_recv_need_job(problem_t *problem)
 
 	/* jdeme poslat praci, takze musime zkontrolovat, zdali se nemame
 	 * ospinit */
-	if (problem->status.MPI_SOURCE < problem->mpi_rank)
-		problem->token_dirty = TOKEN_DIRTY;
 
-	stack_items = (int)(problem->stack->items_cnt / 2);
+	/* XXX: TODO: FIXME: */
+	if (problem->status.MPI_SOURCE < problem->mpi_rank){
+		mpi_printf(problem, "Sending job to lower cpu I'm TOKEN DIRTY\n");
+		problem->token_dirty = TOKEN_DIRTY;
+	}
+
+	items_to_send = (int)(stack_items(problem->stack) / 3);
 	pack_position = 0;
-	MPI_Pack(&stack_items, 1, MPI_INT, problem->buffer, BUFFER_LENGTH,
+	MPI_Pack(&items_to_send, 1, MPI_INT, problem->buffer, BUFFER_LENGTH,
 	    &pack_position, MPI_COMM_WORLD);
-	for (i = 0; i < stack_items; i++) {
+	for (i = 0; i < items_to_send; i++) {
 		item = stack_divide(problem->stack);
+
+		assert(item != NULL);
+		assert(item->solution != NULL);
+		assert(item->solution->data != NULL);
+		assert(problem->buffer != NULL);
 
 		MPI_Pack(item->solution->data, problem->graph->n, MPI_CHAR,
 		    problem->buffer, BUFFER_LENGTH, &pack_position,
@@ -231,8 +242,8 @@ mpi_recv_need_job(problem_t *problem)
 		stack_item_free(item);
 	}
 
-	mpi_printf(problem, "MPI_Send cpu=%d STACK\n",
-	    problem->status.MPI_SOURCE);
+	mpi_printf(problem, "MPI_Send cpu=%d items=%d STACK\n",
+	    problem->status.MPI_SOURCE, items_to_send);
 	MPI_Send(problem->buffer, pack_position, MPI_PACKED,
 	    problem->status.MPI_SOURCE, TAG_STACK, MPI_COMM_WORLD);
 }
@@ -302,12 +313,16 @@ mpi_recv(problem_t *problem)
 			mpi_recv_best_nodes(problem);
 			break;
 		case TAG_FINALIZE:
+			assert(problem->mpi_rank != MASTER_CPU);
 			mpi_recv_finalize(problem);
 			break;
 		case TAG_NO_JOB:
 			MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG,
 			    MPI_COMM_WORLD, &problem->status);
 			problem->mpi_waiting_for_no_job = FALSE;
+
+			/* XXX: just calm down */
+			sleep(1);
 			break;
 		case TAG_STACK:
 			problem->mpi_waiting_for_no_job = FALSE;
@@ -420,13 +435,19 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 	problem = problem_init(graph_filename, i_domination);
 
 	MPI_Init(argc, argv);
-	time_init = MPI_Wtime();
-	problem->mpi_on = TRUE;
-	MPI_Comm_rank(MPI_COMM_WORLD, &(problem->mpi_rank));
-	MPI_Comm_size(MPI_COMM_WORLD, &(problem->mpi_cpus));
-	problem->mpi_cpu_to_ask = (problem->mpi_rank + 1) % problem->mpi_cpus;
+	mpi_printf(problem, "MPI_Init OK\n");
 
-	mpi_printf(problem, "Init!\n");
+	MPI_Comm_rank(MPI_COMM_WORLD, &problem->mpi_rank);
+	mpi_printf(problem, "MPI_Comm_rank OK rank=%d\n", problem->mpi_rank);
+
+	time_init = MPI_Wtime();
+
+	problem->mpi_on = TRUE;
+
+	MPI_Comm_size(MPI_COMM_WORLD, &problem->mpi_cpus);
+	mpi_printf(problem, "MPI_Comm_size OK cpus=%d\n", problem->mpi_cpus);
+
+	problem->mpi_cpu_to_ask = (problem->mpi_rank + 1) % problem->mpi_cpus;
 
 	if (problem->mpi_rank == MASTER_CPU) {
 		mpi_init_master_cpu(problem);
@@ -437,40 +458,64 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 	time_elapsed[0] = MPI_Wtime();
 	for (cycle = 0; !problem->finalize; cycle++) {
 
-		if ((item = stack_pop(problem->stack)) &&
-		    !problem_is_solution(problem, item))
-			problem_stack_expand(problem, item);
+		if(cycle%50000==0)
+			printf("cpu=%d cycle=%ld, computed_items=%d "
+			    "stack_items=%d\n",
+			    problem->mpi_rank,
+			    cycle,
+			    problem->computed_items,
+			    stack_items(problem->stack));
 
-		if (item != NULL) {
+		if ((item = stack_pop(problem->stack))) {
 			problem->computed_items++;
-			mpi_printf(problem, "tried item: ");
-#if DEBUG
-			bit_array_print(item->solution);
-#endif /* DEBUG */
+
+			if(0)
+			mpi_printf(problem, "ML have item\n");
+
+			if (item->level >= problem->best_solution_nodes ||
+			    item->level > problem->nodes_max) {
+				if(0)
+				mpi_printf(problem, "ML too much nodes\n");
+				stack_item_free(item);
+				continue;
+			}
+
+			if (problem_is_solution(problem, item)) {
+				if(0)
+				mpi_printf(problem, "ML is solution\n");
+
+				if (item->level <= problem->nodes_min) {
+					if(0)
+					mpi_printf(problem, "ML perfect\n");
+					stack_item_free(item);
+					break;
+				}
+
+				stack_item_free(item);
+				continue;
+			}
+
+			if(0)
+			mpi_printf(problem, "ML expanding\n");
+
+			problem_stack_expand(problem, item);
+			stack_item_free(item);
 		}
 
-		stack_item_free(item);
-
+		/* pokud uz nebylo nic v zasoniku, tak item je null */
 		if (item == NULL ||
 		    (cycle % CYCLES_MPI_MESSAGES) == 0) {
-			mpi_printf(problem, "items=%d\n",
-			    problem->stack->items_cnt);
 
 			time_elapsed[1] = MPI_Wtime();
-
-			mpi_printf(problem, "computation handled in %lf."
-			    "stack_is_empty=%d\n",
-			    stack_is_empty(problem->stack),
-			    time_elapsed[0] - time_elapsed[1]);
 
 			mpi_recv(problem);
 			mpi_send(problem);
 
 			time_elapsed[0] = MPI_Wtime();
-			mpi_printf(problem, "messages handled in %lf\n",
-			    time_elapsed[1] - time_elapsed[0]);
 		}
 	}
+
+	time_elapsed[0]=time_elapsed[1];
 
 	time_finalize = MPI_Wtime();
 	mpi_printf(problem, "Finalize! Total time=%lf\n",
@@ -479,8 +524,9 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 
 
 	sleep(2);
-	printf("I, %d,  did %d work\n", problem->mpi_rank,
-	    problem->computed_items);
+	printf("I, %d,  did %d work. My best solution %d\n", problem->mpi_rank,
+	    problem->computed_items, problem->best_solution_nodes);
+	bit_array_print(problem->best_solution);
 
 	if (problem->mpi_rank == MASTER_CPU) {
 		/* aby byl vystup na konci, tak se prospime */
@@ -510,7 +556,8 @@ mpi_printf(problem_t *problem, const char *format, ...)
 
 	code_lo = 30 + (4 - problem->mpi_rank + 64) % 8;
 	code_hi = !(((problem->mpi_rank) % 16) / 8);
-	fprintf(stdout, "\x1b[%d;%dm[%d] ", code_hi, code_lo, problem->mpi_rank);
+	fprintf(stdout, "\x1b[%d;%dm[%d][%d] ", code_hi, code_lo,
+	    problem->mpi_rank, stack_items(problem->stack));
 	fflush(stdout);
 
 	va_start(args, format);

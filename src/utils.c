@@ -154,40 +154,35 @@ stack_init(void)
 	}
 
 	stack->size = DEFAULT_STACK_SIZE;
-	stack->items_cnt = 0;
+	stack->top = 0;
 	stack->bottom = 0;
 
 	return (stack);
 }
 
 int
-stack_is_empty(stack_t *stack)
+stack_items(stack_t *stack)
 {
-	assert(stack != NULL);
-
-	return (stack->items_cnt - stack->bottom == 0);
+	return (stack->top - stack->bottom);
 }
 
-stack_item_t *
-stack_pop(stack_t *stack)
+int
+stack_is_empty(stack_t *stack)
 {
-	assert(stack != NULL);
+	return (stack_items(stack) == 0);
+}
 
-	if (stack->items_cnt - stack->bottom > 0) {
-		stack->items_cnt--;
-		return (stack->items[stack->items_cnt]);
-	} else {
-		return (NULL);
-	}
+void
+stack_delete_items(stack_t *stack)
+{
+	while (!stack_is_empty(stack))
+		stack_item_free(stack_pop(stack));
 }
 
 void
 stack_free(stack_t *stack)
 {
-	assert(stack != NULL);
-
-	while (!stack_is_empty(stack))
-		stack_item_free(stack_pop(stack));
+	stack_delete_items(stack);
 
 	free(stack->items);
 	free(stack);
@@ -198,7 +193,7 @@ stack_push(stack_t *stack, stack_item_t *item)
 {
 	stack_item_t **tmp_items;
 
-	if(stack->items_cnt >= stack->size) {
+	if(stack->top >= stack->size) {
 		stack->size *= 2;
 
 		if ((tmp_items = realloc(stack->items, stack->size *
@@ -211,8 +206,20 @@ stack_push(stack_t *stack, stack_item_t *item)
 		stack->items = tmp_items;
 	}
 
-	stack->items[stack->items_cnt] = item;
-	stack->items_cnt++;
+	stack->items[stack->top] = item;
+	stack->top++;
+}
+
+stack_item_t *
+stack_pop(stack_t *stack)
+{
+	assert(stack != NULL);
+
+	if (stack_is_empty(stack))
+		return (NULL);
+
+	stack->top--;
+	return (stack->items[stack->top]);
 }
 
 stack_item_t *
@@ -220,9 +227,8 @@ stack_divide(stack_t *stack)
 {
 	stack_item_t *item;
 
-	if(stack->items_cnt - stack->bottom < 2){
-		return NULL;
-	}
+	if (stack_is_empty(stack))
+		return (NULL);
 
 	item = stack->items[stack->bottom];
 	stack->bottom++;

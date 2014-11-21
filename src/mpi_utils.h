@@ -28,10 +28,10 @@
 #define TOKEN_DIRTY 2
 
 /* XXX: after how many cycles we recieve and send messages */
-#define CYCLES_MPI_MESSAGES 100
+#define CYCLES_MPI_MESSAGES 1000
 
 #define DEFAULT_STACK_SIZE 10000
-#define BUFFER_LENGTH 900
+#define BUFFER_LENGTH 50000
 
 
 void mpi_send_best_solution_nodes(problem_t *problem);
