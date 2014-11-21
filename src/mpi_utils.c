@@ -196,6 +196,13 @@ mpi_recv_need_job(problem_t *problem)
 	int items_to_send;
 	int pack_position;
 	int i;
+	int j;
+	int one_item_length;
+	int max_items_in_part;
+	int parts_to_send;
+	int actual_item;
+	int left_send;
+	int actual_to_send;
 	stack_item_t *item;
 
 	MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
@@ -218,34 +225,45 @@ mpi_recv_need_job(problem_t *problem)
 		problem->token_dirty = TOKEN_DIRTY;
 	}
 
+	one_item_length = 2 * problem->graph->n * sizeof(MPI_CHAR) + sizeof(MPI_INT);
 	items_to_send = (int)(stack_items(problem->stack) / 3);
-	pack_position = 0;
-	MPI_Pack(&items_to_send, 1, MPI_INT, problem->buffer, BUFFER_LENGTH,
-	    &pack_position, MPI_COMM_WORLD);
-	for (i = 0; i < items_to_send; i++) {
-		item = stack_divide(problem->stack);
+	max_items_in_part = BUFFER_LENGTH / one_item_length;
+	parts_to_send = items_to_send / max_items_in_part + 1;
+	actual_item = 0;
 
-		assert(item != NULL);
-		assert(item->solution != NULL);
-		assert(item->solution->data != NULL);
-		assert(problem->buffer != NULL);
+	for(j = 0; j < parts_to_send; j++){
+		pack_position = 0;
+		left_send = items_to_send - actual_item;
+		actual_to_send = fmax(left_send, max_items_in_part);
+		MPI_Pack(&actual_to_send, 1, MPI_INT, problem->buffer, BUFFER_LENGTH,
+		    &pack_position, MPI_COMM_WORLD);
+		for (i = 0; i < actual_to_send; i++) {
+			item = stack_divide(problem->stack);
 
-		MPI_Pack(item->solution->data, problem->graph->n, MPI_CHAR,
-		    problem->buffer, BUFFER_LENGTH, &pack_position,
-		    MPI_COMM_WORLD);
-		MPI_Pack(item->dominated_nodes->data, problem->graph->n,
-		    MPI_CHAR, problem->buffer, BUFFER_LENGTH, &pack_position,
-		    MPI_COMM_WORLD);
-		MPI_Pack(&item->level, 1, MPI_INT, problem->buffer,
-		    BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+			assert(item != NULL);
+			assert(item->solution != NULL);
+			assert(item->solution->data != NULL);
+			assert(problem->buffer != NULL);
 
-		stack_item_free(item);
+			MPI_Pack(item->solution->data, problem->graph->n, MPI_CHAR,
+			    problem->buffer, BUFFER_LENGTH, &pack_position,
+			    MPI_COMM_WORLD);
+			MPI_Pack(item->dominated_nodes->data, problem->graph->n,
+			    MPI_CHAR, problem->buffer, BUFFER_LENGTH, &pack_position,
+			    MPI_COMM_WORLD);
+			MPI_Pack(&item->level, 1, MPI_INT, problem->buffer,
+			    BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);
+
+			stack_item_free(item);
+			actual_item++;
+		}
+
+		mpi_printf(problem, "MPI_Send cpu=%d items=%d STACK\n",
+		    problem->status.MPI_SOURCE, items_to_send);
+		MPI_Send(problem->buffer, pack_position, MPI_PACKED,
+		    problem->status.MPI_SOURCE, TAG_STACK, MPI_COMM_WORLD);
 	}
 
-	mpi_printf(problem, "MPI_Send cpu=%d items=%d STACK\n",
-	    problem->status.MPI_SOURCE, items_to_send);
-	MPI_Send(problem->buffer, pack_position, MPI_PACKED,
-	    problem->status.MPI_SOURCE, TAG_STACK, MPI_COMM_WORLD);
 }
 
 void

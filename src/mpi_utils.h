@@ -31,7 +31,7 @@
 #define CYCLES_MPI_MESSAGES 1000
 
 #define DEFAULT_STACK_SIZE 10000
-#define BUFFER_LENGTH 50000
+#define BUFFER_LENGTH 990
 
 
 void mpi_send_best_solution_nodes(problem_t *problem);
