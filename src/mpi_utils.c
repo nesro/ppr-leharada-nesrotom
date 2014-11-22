@@ -144,8 +144,8 @@ mpi_handle_token(problem_t *problem)
 	 * svoji spinavost. po odeslani peska se ale my ocistime */
 	if (stack_is_empty(problem->stack)) {
 
-		if (problem->token_dirty == TOKEN_CLEAN)
-			problem->token = TOKEN_CLEAN;
+		if (problem->token_dirty == TOKEN_DIRTY)
+			problem->token = TOKEN_DIRTY;
 
 		mpi_printf(problem, "MPI_Send cpu=%d TOKEN dirty=%d\n",
 		    ((problem->mpi_rank + 1) % problem->mpi_cpus),
@@ -155,7 +155,6 @@ mpi_handle_token(problem_t *problem)
 		    MPI_COMM_WORLD);
 
 		problem->token_dirty = TOKEN_CLEAN;
-		problem->token = TOKEN_CLEAN;
 		problem->token_have = FALSE;
 	}
 }
