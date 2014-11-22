@@ -181,7 +181,12 @@ mpi_recv_token(problem_t *problem)
 void
 mpi_send(problem_t *problem)
 {
-	if (stack_is_empty(problem->stack) && !problem->mpi_waiting_for_no_job)
+	/* zadame praci, pokud
+	 * 1) mame prazdny stack
+	 * 2) necekame na odpoved na predchozi pozadavek o praci
+	 * 3) neukoncujeme */
+	if (stack_is_empty(problem->stack) && !problem->mpi_waiting_for_no_job
+	    && !problem->finalize)
 		mpi_send_need_job(problem);
 
 	mpi_handle_token(problem);
