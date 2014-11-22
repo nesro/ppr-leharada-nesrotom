@@ -203,6 +203,8 @@ mpi_recv_need_job(problem_t *problem)
 	int actual_item;
 	int left_send;
 	int actual_to_send;
+	int mpi_char_size;
+	int mpi_int_size;
 	stack_item_t *item;
 
 	MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
@@ -225,7 +227,10 @@ mpi_recv_need_job(problem_t *problem)
 		problem->token_dirty = TOKEN_DIRTY;
 	}
 
-	one_item_length = 2 * problem->graph->n * sizeof(MPI_CHAR) + sizeof(MPI_INT);
+	mpi_char_size = 1;
+	mpi_int_size = 4;
+
+	one_item_length = 2 * problem->graph->n * mpi_char_size + mpi_int_size;
 	items_to_send = (int)(stack_items(problem->stack) / 3);
 	max_items_in_part = BUFFER_LENGTH / one_item_length;
 	parts_to_send = items_to_send / max_items_in_part + 1;
@@ -234,7 +239,7 @@ mpi_recv_need_job(problem_t *problem)
 	for(j = 0; j < parts_to_send; j++){
 		pack_position = 0;
 		left_send = items_to_send - actual_item;
-		actual_to_send = fmax(left_send, max_items_in_part);
+		actual_to_send = fmin(left_send, max_items_in_part);
 		MPI_Pack(&actual_to_send, 1, MPI_INT, problem->buffer, BUFFER_LENGTH,
 		    &pack_position, MPI_COMM_WORLD);
 		for (i = 0; i < actual_to_send; i++) {
