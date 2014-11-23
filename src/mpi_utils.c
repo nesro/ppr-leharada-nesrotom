@@ -331,7 +331,7 @@ mpi_recv(problem_t *problem)
 {
 	int flag;
 
-	/* for (;;) { */
+	for (;;) {
 		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag,
 		    &problem->status);
 
@@ -387,7 +387,7 @@ mpi_recv(problem_t *problem)
 			assert(0);
 			break;
 		}
-	/* } */
+	}
 }
 
 
