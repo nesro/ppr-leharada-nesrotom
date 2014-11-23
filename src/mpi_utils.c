@@ -144,10 +144,10 @@ mpi_handle_token(problem_t *problem)
 	/* pokud mame prazdny zasobnik, posleme peska dal. pesek si zachova
 	 * svoji spinavost. po odeslani peska se ale my ocistime */
 	if (stack_is_empty(problem->stack)) {
-
 		if (problem->token_dirty == TOKEN_DIRTY)
 			problem->token = TOKEN_DIRTY;
-		else
+
+		if (problem->mpi_rank == MASTER_CPU)
 			problem->token = TOKEN_CLEAN;
 
 		mpi_printf(problem, "MPI_Send cpu=%d TOKEN dirty=%d\n",
@@ -165,7 +165,7 @@ mpi_handle_token(problem_t *problem)
 void
 mpi_recv_token(problem_t *problem)
 {
-	MPI_Recv(&problem->token, 1, MPI_INT, problem->status.MPI_SOURCE,
+	MPI_Recv(&problem->token, 1, MPI_CHAR, problem->status.MPI_SOURCE,
 	    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
 	mpi_printf(problem, "MPI_Recv from=%d TOKEN dirty=%d\n",
 	    problem->status.MPI_SOURCE, problem->token);
@@ -521,11 +521,7 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 
 			problem_stack_expand(problem, item);
 			stack_item_free(item);
-		} else {
-			/* nemam nic na stacku, takze budu spamovat ostatni */
-			/* takze radsi si dachnu */
-			sleep(3);
-		}
+		} 
 
 		/* pokud uz nebylo nic v zasoniku, tak item je null */
 		if (item == NULL ||

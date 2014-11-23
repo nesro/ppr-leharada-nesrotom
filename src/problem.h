@@ -30,7 +30,7 @@ typedef struct problem {
 	 * when we send the token, we set token_have to false */
 	bool_t token_have;
 	/* this is the token we've recieved */
-	int token;
+	char token;
 	/* if we send work to someone with lower id, this is true */
 	bool_t token_dirty;
 
