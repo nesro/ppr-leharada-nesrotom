@@ -37,7 +37,7 @@ mpi_send_best_solution_nodes(problem_t *problem)
 void
 mpi_recv_stack(problem_t *problem)
 {
-	int stack_items;
+	int stack_recv_items;
 	int pack_position;
 	int i;
 	stack_item_t *item;
@@ -46,10 +46,13 @@ mpi_recv_stack(problem_t *problem)
 	    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
 
 	pack_position = 0;
-	MPI_Unpack(problem->buffer, BUFFER_LENGTH, &pack_position, &stack_items,
-	    1, MPI_INT, MPI_COMM_WORLD);
+	MPI_Unpack(problem->buffer, BUFFER_LENGTH, &pack_position,
+	    &stack_recv_items, 1, MPI_INT, MPI_COMM_WORLD);
 
-	for (i = 0; i < stack_items; i++) {
+	mpi_printf(problem, "recieved items=%d from cpu=%d\n", stack_recv_items,
+	    problem->status.MPI_SOURCE);
+
+	for (i = 0; i < stack_recv_items; i++) {
 		item = stack_item_init(problem->graph->n);
 
 		MPI_Unpack(problem->buffer, BUFFER_LENGTH, &pack_position,
@@ -217,7 +220,7 @@ mpi_recv_need_job(problem_t *problem)
 	MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
 	    &problem->status);
 
-	if (stack_items(problem->stack) < 5) {
+	if (stack_items(problem->stack) < 10) {
 		mpi_printf(problem, "MPI_Send cpu=%d NO_JOB\n",
 		    problem->status.MPI_SOURCE);
 		MPI_Send(NULL, 0, MPI_CHAR, problem->status.MPI_SOURCE,
@@ -238,7 +241,7 @@ mpi_recv_need_job(problem_t *problem)
 	mpi_int_size = 4;
 
 	one_item_length = 2 * problem->graph->n * mpi_char_size + mpi_int_size;
-	items_to_send = (int)(stack_items(problem->stack) / 3);
+	items_to_send = (int)(stack_items(problem->stack) / 4);
 	max_items_in_part = BUFFER_LENGTH / one_item_length;
 	parts_to_send = items_to_send / max_items_in_part + 1;
 	actual_item = 0;
@@ -270,8 +273,10 @@ mpi_recv_need_job(problem_t *problem)
 			actual_item++;
 		}
 
-		mpi_printf(problem, "MPI_Send cpu=%d items=%d STACK\n",
-		    problem->status.MPI_SOURCE, items_to_send);
+		mpi_printf(problem, "MPI_Send cpu=%d items=%d left=%d "
+		   "actual_to_send=%d actual_item=%d STACK\n",
+		   problem->status.MPI_SOURCE, items_to_send, left_send,
+		   actual_to_send, actual_item);
 		MPI_Send(problem->buffer, pack_position, MPI_PACKED,
 		    problem->status.MPI_SOURCE, TAG_STACK, MPI_COMM_WORLD);
 	}
