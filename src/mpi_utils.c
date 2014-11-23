@@ -133,9 +133,10 @@ mpi_handle_token(problem_t *problem)
 
 		problem->master_token_dispatched = TRUE;
 		problem->token_dirty = TOKEN_CLEAN;
+		problem->token = TOKEN_CLEAN;
 
 		mpi_printf(problem, "MPI_Send cpu=%d FIRST TOKEN\n", 1);
-		MPI_Send(&problem->token_dirty, 1, MPI_INT, 1, TAG_TOKEN,
+		MPI_Send(&problem->token, 1, MPI_CHAR, 1, TAG_TOKEN,
 		    MPI_COMM_WORLD);
 
 		return;
