@@ -28,7 +28,7 @@
 #define TOKEN_DIRTY 2
 
 /* XXX: after how many cycles we recieve and send messages */
-#define CYCLES_MPI_MESSAGES 1000
+#define CYCLES_MPI_MESSAGES 100
 
 #define DEFAULT_STACK_SIZE 10000
 #define BUFFER_LENGTH 990
