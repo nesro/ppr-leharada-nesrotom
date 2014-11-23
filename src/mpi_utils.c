@@ -26,7 +26,8 @@ mpi_send_best_solution_nodes(problem_t *problem)
 		if (i == problem->mpi_rank)
 			continue;
 
-		mpi_printf(problem, "MPI_Send cpu=%d BEST_NODES\n", i);
+		mpi_printf(problem, "MPI_Send cpu=%d nodes=%d BEST_NODES\n", i,
+		    problem->best_solution_nodes);
 		MPI_Send(&problem->best_solution_nodes, 1, MPI_INT, i,
 		    TAG_BEST_NODES, MPI_COMM_WORLD);
 	}
@@ -137,7 +138,7 @@ mpi_handle_token(problem_t *problem)
 		return;
 	}
 
-	if (!problem->token_have)
+	if (!problem->token_have || problem->finalize)
 		return;
 
 	/* pokud mame prazdny zasobnik, posleme peska dal. pesek si zachova
@@ -146,6 +147,8 @@ mpi_handle_token(problem_t *problem)
 
 		if (problem->token_dirty == TOKEN_DIRTY)
 			problem->token = TOKEN_DIRTY;
+		else
+			problem->token = TOKEN_CLEAN;
 
 		mpi_printf(problem, "MPI_Send cpu=%d TOKEN dirty=%d\n",
 		    ((problem->mpi_rank + 1) % problem->mpi_cpus),
@@ -282,8 +285,8 @@ mpi_recv_best_nodes(problem_t *problem)
 	MPI_Recv(&best_nodes_recv, 1, MPI_INT, MPI_ANY_SOURCE,
 	    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
 
-	mpi_printf(problem, "got best nodes %d from %d, i have %d\n",
-	    problem->best_solution_nodes, problem->status.MPI_SOURCE,
+	mpi_printf(problem, "got best nodes=%d from=%d, i have=%d\n",
+	    best_nodes_recv, problem->status.MPI_SOURCE,
 	    problem->best_solution_nodes);
 
 	if (best_nodes_recv < problem->best_solution_nodes) {
@@ -323,7 +326,7 @@ mpi_recv(problem_t *problem)
 {
 	int flag;
 
-	for (;;) {
+	/* for (;;) { */
 		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag,
 		    &problem->status);
 
@@ -352,9 +355,6 @@ mpi_recv(problem_t *problem)
 			MPI_Recv(NULL, 0, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG,
 			    MPI_COMM_WORLD, &problem->status);
 			problem->mpi_waiting_for_no_job = FALSE;
-
-			/* XXX: just calm down */
-			sleep(1);
 			break;
 		case TAG_STACK:
 			problem->mpi_waiting_for_no_job = FALSE;
@@ -382,7 +382,7 @@ mpi_recv(problem_t *problem)
 			assert(0);
 			break;
 		}
-	}
+	/* } */
 }
 
 
@@ -492,33 +492,25 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 
 		if(cycle%50000==0)
 			printf("cpu=%d cycle=%ld, computed_items=%d "
-			    "stack_items=%d\n",
+			    "stack_items=%d dirty=%d, have=%d\n",
 			    problem->mpi_rank,
 			    cycle,
 			    problem->computed_items,
-			    stack_items(problem->stack));
+			    stack_items(problem->stack),
+			    problem->token_dirty,
+			    problem->token_have);
 
 		if ((item = stack_pop(problem->stack))) {
 			problem->computed_items++;
 
-			if(0)
-			mpi_printf(problem, "ML have item\n");
-
 			if (item->level >= problem->best_solution_nodes ||
 			    item->level > problem->nodes_max) {
-				if(0)
-				mpi_printf(problem, "ML too much nodes\n");
 				stack_item_free(item);
 				continue;
 			}
 
 			if (problem_is_solution(problem, item)) {
-				if(0)
-				mpi_printf(problem, "ML is solution\n");
-
 				if (item->level <= problem->nodes_min) {
-					if(0)
-					mpi_printf(problem, "ML perfect\n");
 					stack_item_free(item);
 					break;
 				}
@@ -527,11 +519,12 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 				continue;
 			}
 
-			if(0)
-			mpi_printf(problem, "ML expanding\n");
-
 			problem_stack_expand(problem, item);
 			stack_item_free(item);
+		} else {
+			/* nemam nic na stacku, takze budu spamovat ostatni */
+			/* takze radsi si dachnu */
+			sleep(3);
 		}
 
 		/* pokud uz nebylo nic v zasoniku, tak item je null */

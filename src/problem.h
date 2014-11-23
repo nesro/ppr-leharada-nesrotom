@@ -16,6 +16,7 @@ typedef struct problem {
 
 	bit_array_t *best_solution;
 	int best_solution_nodes;
+	int best_solution_number_of_order; /* kolik sem uz jich nasel */
 	bool_t best_solution_i_computed_it;
 	bool_t opimal_solution_found;
 

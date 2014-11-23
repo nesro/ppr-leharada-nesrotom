@@ -35,10 +35,12 @@ problem_is_solution(problem_t *problem, stack_item_t *item)
 		problem->best_solution_nodes = item->level;
 		bit_array_copy(problem->best_solution, item->solution);
 		problem->best_solution_i_computed_it = TRUE;
+		problem->best_solution_number_of_order++;
 
 		/* nasli jsme nejlepsi reseni, musime ho broadcastovat ostatnim
 		 */
-		if (problem->mpi_on)
+		if (problem->best_solution_number_of_order > 5 &&
+		    problem->mpi_on)
 			mpi_send_best_solution_nodes(problem);
 	}
 
