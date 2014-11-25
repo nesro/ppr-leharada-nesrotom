@@ -328,6 +328,30 @@ mpi_recv_finalize(problem_t *problem)
 }
 
 void
+mpi_recv_solution(problem_t *problem)
+{
+	bit_array_t *recv_solution;
+	int recv_solution_nodes;
+
+	assert(problem->mpi_rank == MASTER_CPU);
+	problem->master_finalize_answers++;
+
+	recv_solution = bit_array_init(problem->graph->n);
+	MPI_Recv(recv_solution->data, problem->graph->n, MPI_CHAR,
+	    MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
+
+	recv_solution_nodes =
+	    bit_array_count_nodes(recv_solution);
+
+	if (recv_solution_nodes < problem->best_solution_nodes) {
+		problem->best_solution_nodes = recv_solution_nodes;
+		bit_array_copy(problem->best_solution, recv_solution);
+	}
+
+	bit_array_free(recv_solution);
+}
+
+void
 mpi_recv(problem_t *problem)
 {
 	int flag;
@@ -373,15 +397,7 @@ mpi_recv(problem_t *problem)
 			    MPI_COMM_WORLD, &problem->status);
 			break;
 		case TAG_SOLUTION:
-			assert(problem->mpi_rank == MASTER_CPU);
-			problem->master_finalize_answers++;
-
-			MPI_Recv(problem->best_solution->data,
-			    problem->graph->n, MPI_CHAR, MPI_ANY_SOURCE,
-			    MPI_ANY_TAG, MPI_COMM_WORLD, &problem->status);
-
-			problem->best_solution_nodes =
-			    bit_array_count_nodes(problem->best_solution);
+			mpi_recv_solution(problem);
 			break;
 		default:
 			mpi_printf(problem, "unknown tag\n");
@@ -465,7 +481,6 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 {
 	problem_t *problem;
 	stack_item_t *item;
-	double time_elapsed[2];
 	double time_init;
 	double time_finalize;
 	unsigned long int cycle;
@@ -478,6 +493,7 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 	MPI_Comm_rank(MPI_COMM_WORLD, &problem->mpi_rank);
 	mpi_printf(problem, "MPI_Comm_rank OK rank=%d\n", problem->mpi_rank);
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	time_init = MPI_Wtime();
 
 	problem->mpi_on = TRUE;
@@ -493,12 +509,12 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 		mpi_init_slave_cpu(problem);
 	}
 
-	time_elapsed[0] = MPI_Wtime();
 	for (cycle = 0; !problem->finalize; cycle++) {
 
-		if(cycle%50000==0)
-			printf("cpu=%d cycle=%ld, computed_items=%d "
-			    "stack_items=%d dirty=%d, have=%d\n",
+		if(cycle%1000000==0)
+			mpi_printf(problem, "cpu=%d cycle=%ld,"
+			    " computed_items=%d stack_items=%d dirty=%d,"
+			    " have=%d\n",
 			    problem->mpi_rank,
 			    cycle,
 			    problem->computed_items,
@@ -532,37 +548,22 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 		/* pokud uz nebylo nic v zasoniku, tak item je null */
 		if (item == NULL ||
 		    (cycle % CYCLES_MPI_MESSAGES) == 0) {
-
-			time_elapsed[1] = MPI_Wtime();
-
 			mpi_recv(problem);
 			mpi_send(problem);
-
-			time_elapsed[0] = MPI_Wtime();
 		}
 	}
 
-	time_elapsed[0]=time_elapsed[1];
-
+	MPI_Barrier(MPI_COMM_WORLD);
 	time_finalize = MPI_Wtime();
-	mpi_printf(problem, "Finalize! Total time=%lf\n",
-	    time_finalize - time_init);
 	MPI_Finalize();
 
+#ifndef DEBUG
+	sleep(5);
+#endif /* DEBUG */
 
-	sleep(2);
-	printf("I, %d,  did %d work. My best solution %d\n", problem->mpi_rank,
-	    problem->computed_items, problem->best_solution_nodes);
-	bit_array_print(problem->best_solution);
-
-	if (problem->mpi_rank == MASTER_CPU) {
-		/* aby byl vystup na konci, tak se prospime */
-		sleep(2);
-
-		printf("XXXXXXXXXXXXXXXXXXX\nRESULT: %d ",
-		    problem->best_solution_nodes);
-		bit_array_print(problem->best_solution);
-	}
+	printf("cpu %d work %d solution %d time %lf\n", problem->mpi_rank,
+	    problem->computed_items, problem->best_solution_nodes,
+	    time_finalize - time_init);
 
 	problem_free(problem);
 
@@ -577,7 +578,7 @@ mpi_printf(problem_t *problem, const char *format, ...)
 	va_list args;
 
 	/*pokud neni zaply debug, nevypisovat tyhle volani */
-#if !(DEBUG)
+#ifndef DEBUG
 	return;
 #endif /* DEBUG */
 
