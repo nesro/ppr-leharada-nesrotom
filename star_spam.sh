@@ -24,6 +24,7 @@ main() {
 		for cpus in 2 4 8 16 32; do
 			echo ./measure/graph${graph[g]}.txt ${dom[g]} $cpus
 			run_job $cpus ./measure/graph${graph[g]}.txt ${dom[g]}
+			wait_for_slot
 		done
 	done
 }
