@@ -114,8 +114,6 @@ INFINIBAND="true"
 #  ===========================================================================
 MY_PARALLEL_PROGRAM="./main --mpi $2 $3"
 
-
-
 #  ===========================================================================
 # |                                                                           |
 # | Export environment variable to execution nodes                            |
@@ -139,7 +137,7 @@ then
 #  -------------------------------------------------------------------------
 # | Set network communication openMPI between nodes - InfiniBand (openib)   |
 #  -------------------------------------------------------------------------
-	mpirun -np \$NSLOTS ${MY_PARALLEL_PROGRAM}
+	mpirun -np \$NSLOTS \${MY_PARALLEL_PROGRAM}
 else
 #  -------------------------------------------------------------------------
 # | Set network communication openMPI between nodes - Ethernet (tcp)        |
