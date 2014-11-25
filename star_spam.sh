@@ -1,30 +1,18 @@
 #!/bin/bash
 
-graph[0]="1"
+graph[0]="1o"
 dom[0]=4
-graph[1]="1o"
-dom[1]=4
-graph[2]="1s"
-dom[2]=4
-graph[3]="2"
-dom[3]=1
-graph[4]="2o"
-dom[4]=1
-graph[5]="2s"
-dom[5]=1
-graph[6]="3"
-dom[6]=2
-graph[7]="3o"
-dom[7]=2
-graph[8]="3s"
-dom[8]=2
+graph[1]="2o"
+dom[1]=1
+graph[2]="3o"
+dom[2]=2
 
 main() {
 	for (( g=0; g < ${#graph[@]}; g++ )); do
-		for cpus in 2 4 8 16 32; do
+		for (( cpus=2; cpus < 33; cpus++ )); do
+			wait_for_slot
 			echo ./measure/graph${graph[g]}.txt ${dom[g]} $cpus
 			run_job $cpus ./measure/graph${graph[g]}.txt ${dom[g]}
-			wait_for_slot
 		done
 	done
 }
