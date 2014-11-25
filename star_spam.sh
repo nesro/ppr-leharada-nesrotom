@@ -105,14 +105,14 @@ run_job() {
 # |   true  - Network communications over Infniband                           |
 # |                                                                           |
 #  ===========================================================================
-		INFINIBAND="true"
+INFINIBAND="true"
 
 #  ===========================================================================
 # |                                                                           |
 # | Parallel program with arguments.                                          |
 # |                                                                           |
 #  ===========================================================================
-		MY_PARALLEL_PROGRAM="./main --mpi $2 $3"
+MY_PARALLEL_PROGRAM="./main --mpi $2 $3"
 
 
 
@@ -124,10 +124,6 @@ run_job() {
 # export MY_VARIABLE1="..."
 # export MY_VARIABLE2="..."
 
-
-
-
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #  ===========================================================================
@@ -138,18 +134,18 @@ run_job() {
 # |                                                                           |
 #  ===========================================================================
 
-		if [[ \${INFINIBAND} = "true" ]]
-			then
+if [[ \${INFINIBAND} = "true" ]]
+then
 #  -------------------------------------------------------------------------
 # | Set network communication openMPI between nodes - InfiniBand (openib)   |
 #  -------------------------------------------------------------------------
-				mpirun -np \$NSLOTS ${MY_PARALLEL_PROGRAM}
-		else
+	mpirun -np \$NSLOTS ${MY_PARALLEL_PROGRAM}
+else
 #  -------------------------------------------------------------------------
 # | Set network communication openMPI between nodes - Ethernet (tcp)        |
 #  -------------------------------------------------------------------------
-			mpirun --mca btl tcp,self -np \$NSLOTS \${MY_PARALLEL_PROGRAM}
-	fi
+	mpirun --mca btl tcp,self -np \$NSLOTS \${MY_PARALLEL_PROGRAM}
+fi
 __EOF__
 	chmod +x $f
 	qrun.sh $1 long $f 
