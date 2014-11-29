@@ -30,7 +30,17 @@ Vstupem algoritmu je graf G reprezentován maticí sousednosti a hodnota i-domin
 Stavový prostor úlohy reprezentuje m-ární strom, kde m je počet uzlů grafu G. V hloubce k obsahuje každý uzel stromu částečné řešení obsahující k uzlů prohledávaného grafu G. Prohledávání stavového prostoru řešíme jako DFS (prohledávání grafu do hloubky). Pro urychlení výpočtu používáme metodu větví a řezů. M-ární strom reprezentující stavový prostor prořezáváme podle doposud nejlepšího nalezeného řešení. Pokud je hloubka uzlu ve stromu větší nebo rovna než počet uzlů grafu v doposud nejlepším nalezeném řešení, tak tuto větev již dále neprohledáváme protože již nemůže obsahovat zlepšující řešení. Pokud nalezneme řešení obsahující počet uzlů rovných těsné horní mezi problému, můžeme výpočet ihned ukončit. Máme zaručeno, že lepší řešení již neexistuje. Těsná horní mez je rovna $\lceil\frac{prumer(G)}{2i+1}\rceil$, kde G je graf a i je hodnota i-dominance.
 
 \section{Popis paralelního algoritmu a jeho implementace v MPI}
-TODO
+
+Po inicializaci master procesor vygeneruje syny korenu stromu stavoveho reseni a rozesle praci ostatnim procesorum. Pote kazdy procesor vstoupi do hlavni smycky, ktera se vykonava, dokud nedojde k ukonceni vypoctu.
+
+V hlavni smycce vybiraji prvky ze zasobniku a testuje se, zdali jsou, nebo nejsou resenim. Po M zpracovanych prvcich, nebo pokud nejsou prvky na zasobinku program prijme zpravy MPI a pote vysle zpravy MPI. Nasleduje popis zprav.
+
+Pokud procesor nalezne lepsi reseni, posle ho ostatnim.
+
+Pokud procesor nema zadnou dalsi praci, pta se na ni postupne ostatnich procesoru. Kdyz odesle pozadavek, nedela nic jineho, nez ze ceka na odpoved a reaguje na prijate zpravy. Pokud procesor dostane zadost o praci, tak pokud ma dostatecny pocet prvku na zasobniku, praci mu posle. Prace se posila ve vice zpravach o velikosti 950kB.
+
+Pokud master procesoru dojde prace, krome zadosti o praci take vysle peska. Pesek je cisty a spinavy. Pokud nejaky procesor poslal praci procesoru s mensim rankem, je spinavy. Kdyz procesor dostane spinaveho peska, posle ho dal jako spinaveho. Po odeslani peska se ocisti. Kdyz se master procesoru vrati cisty pesek, rozesle zpravu o ukonceni vypoctu. Pokud nemaster procesor dostane zpravu o ukonceni vypoctu, odpovi bud ze zpravu prijal, nebo posle reseni s nejmensim poctem uzlu, pokud to byl on, co ho vypocital.
+
 
 \section{Naměřené výsledky a vyhodnocení}
 
