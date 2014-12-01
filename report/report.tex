@@ -12,11 +12,10 @@
 %\parindent=15pt\parskip=2pt
 
 \begin{center}
-\bf Semestralní projekt MI-PAR 2014/2015:\\[5mm]
+\bf Semestralní projekt MI-PPR.2 2014/2015:\\[5mm]
     Úloha DOM: i-dominující množina grafu\\[5mm]
-       Tomáš Nesrovnal\\
-       Adam Léhar\\[2mm]
-magisterské studium, FIT ČVUT, Kolejní 550/2, 160 00 Praha 6\\[2mm]
+       Tomáš Nesrovnal nesrotom@fit.cvut.cz\\
+       Adam Léhar@fit.cvut.cz\\[2mm]
 \today
 \end{center}
 
@@ -31,22 +30,22 @@ Stavový prostor úlohy reprezentuje m-ární strom, kde m je počet uzlů grafu
 
 \section{Popis paralelního algoritmu a jeho implementace v MPI}
 
-Po inicializaci master procesor vygeneruje syny kořenu stromu stavového řešení a rozešle práci ostatním procesorům. Pote každý procesor vstoupí do hlavni smyčky, která se vykonává, dokud nedojde k ukončení výpočtu.
+Po inicializaci master procesor vygeneruje syny kořenu stromu stavového řešení a rozešle práci ostatním procesorům. Poté každý procesor vstoupí do hlavni smyčky, která se vykonává, dokud nedojde k ukončení výpočtu.
 
-V hlavni smyčce vybírají prvky ze zásobníku a testuje se, zdali jsou, nebo nejsou řešením. Po M zpracovaných prvcích, nebo pokud nejsou prvky na zásobníku program přijme zprávy MPI a pote vyšle zprávy MPI. Nasleduje popis zprav.
+V hlavni smyčce vybírají prvky ze zásobníku a testuje se, zdali jsou, nebo nejsou řešením. Po M zpracovaných prvcích, nebo pokud nejsou prvky na zásobníku program přijme zprávy MPI a poté vyšle zprávy MPI. Následuje popis zpráv.
 
-Pokud procesor nalezne lepší řešení, posle ho ostatním.
+Pokud procesor nalezne lepší řešení, pošle ho ostatním.
 
-Pokud procesor nemá žádnou další práci, pta se na ni postupně ostatních procesorů. Když odešle požadavek, nedělá nic jiného, než že čeká na odpověď a reaguje na přijaté zprávy. Pokud procesor dostane zadost o práci, tak pokud má dostatečný počet prvku na zásobníku, práci mu posle. Práce se posílá ve více zprávách o velikosti 950kB.
+Pokud procesor nemá žádnou další práci, ptá se na ni postupně ostatních procesorů. Když odešle požadavek, nedělá nic jiného, než že čeká na odpověď a reaguje na přijaté zprávy. Pokud procesor dostane žádost o práci, tak pokud má dostatečný počet prvku na zásobníku, práci mu pošle. Práce se posílá ve více zprávách o velikosti 950kB.
 
 Pokud master procesoru dojde práce, kromě žádosti o práci také vyšle peška. Pešek je čistý a špinavý. Pokud nějaký procesor poslal práci procesoru s menším rankem, je špinavý. Když procesor dostane špinavého peška, pošle ho dál jako špinavého. Po odeslání peška se očistí. Když se master procesoru vrátí čistý pešek, rozešle zprávu o ukončení výpočtu. Pokud nemaster procesor dostane zprávu o ukončení výpočtu, odpoví bud ze zprávu přijal, nebo posle řešení s nejmenším počtem uzlů, pokud to byl on, co ho vypočítal.
 
 \section{Naměřené výsledky a vyhodnocení}
 Pro měření jsem si vygenerovali 3 různé grafy. Graf 1 obsahuje 200 uzlů, průměrný stupeň uzlu je 4 a i-dominance je také 4. Graf 2 obsahuje 32 uzlů, průměrný stupeň uzlu je 6 a i-dominance je 1. Graf 3 obsahuje 50 uzlů, průměrný stupeň uzlu je 3 a i-dominance je také 2.
 
-Zrychlení na všech grafech jsme naměřili sublineární. Tento výsledek jsem očekávali, protože stejná práce je rozdělena mezi více procesorů a dále přibila komunikační režie mezi procesory. Pro graf 1 a graf 2 s 32 respektive 50 uzly dosáhl výpočet na 32 procesorech zrychlení téměř 15x. Podle grafu lze předpokládá, že zrychlení by se pro více procesorů dále zvětšovalo. Pro graf s 200 uzly na komunikační síti InfiniBand je nejlepší zrychlení pro 25 procesorů. Pak je už komunikační režie tak náročná, že dochází k poklesu zrychlení.
+Zrychlení na všech grafech jsme naměřili sublineární. Tento výsledek jsme očekávali, protože stejná práce je rozdělena mezi více procesorů a dále přibyla komunikační režie mezi procesory. Pro graf 1 a graf 2 s 32 respektive 50 uzly dosáhl výpočet na 32 procesorech zrychlení téměř 15x. Podle grafu lze předpokládát, že zrychlení by se pro více procesorů dále zvětšovalo. Pro graf s 200 uzly na komunikační síti InfiniBand je nejlepší zrychlení pro 25 procesorů. Pak je už komunikační režie tak náročná, že dochází k poklesu zrychlení.
 
-Pro srovnání jsem naměřili výsledky na stejných grafech také pro komunikaci přes Ethernet. Rozdíl je nejvíce patrný na grafu 1 s 200 uzly. Na rozdíl od InfiniBandu nedochází na Ethernetu k poklesu zrychlení pro více procesorů. Pro 32 procesorů jsme dosáhli zrychlení téměř 8x. Také pro další grafy jsme dosáhli lepších výsledků při komunikaci přes Ethernet. Pro graf 2 s 32 uzly je zrychlení téměř ideální, pro 32 procesorů je přibližně 31x.
+Pro srovnání jsme naměřili výsledky na stejných grafech také pro komunikaci přes Ethernet. Rozdíl je nejvíce patrný na grafu 1 s 200 uzly. Na rozdíl od InfiniBandu nedochází na Ethernetu k poklesu zrychlení pro více procesorů. Pro 32 procesorů jsme dosáhli zrychlení téměř 8x. Také pro další grafy jsme dosáhli lepších výsledků při komunikaci přes Ethernet. Pro graf 2 s 32 uzly je zrychlení téměř ideální, pro 32 procesorů je přibližně 31x.
 
 \begin{table}
 	\caption{Naměřené hodnoty pro graf 1: n=200, k=4, i=4}
@@ -220,7 +219,7 @@ Cílem tohoto projektu bylo vyzkoušet si programování počítače s distribuo
 
 Naměřené výsledky odpovídají naším předpokladům. Překvapením trochu bylo, že komunikace přes Ethernet je ve většině případů rychlejší než komunikace přes InfiniBand, která je pro takovéto systémy preferovaná.
 
-Pro grafy s velmi hodně uzly nejsou výsledky příliš uspokojivé. Dochází zde k problémům s návrhem posílání práce ostatním procesorům. Zvolili jsme posílání pouze malých zpráv do 1kB, abychom mohli využívat blokující variantu zpráv. Při posílání velkého množství práce pak dochází k rozdělení zásobníku do více zpráv a pravděpodobně také z zahlcení komunikační sítě. S tímto fakte si lépe poradí Ethernet než InfiniBand.
+Pro grafy s velmi hodně uzly nejsou výsledky příliš uspokojivé. Dochází zde k problémům s návrhem posílání práce ostatním procesorům. Zvolili jsme posílání pouze malých zpráv do 1kB, abychom mohli využívat blokující variantu zpráv. Při posílání velkého množství práce pak dochází k rozdělení zásobníku do více zpráv a pravděpodobně také z zahlcení komunikační sítě. S tímto faktem si lépe poradí Ethernet než InfiniBand.
 
 Ještě lepších výsledků by šlo pravděpodobně dosáhnout předěláním posílání práce do jedné velké zprávy a tím pádem využití neblokujících variant zpráv.   
 
