@@ -31,18 +31,22 @@ Stavový prostor úlohy reprezentuje m-ární strom, kde m je počet uzlů grafu
 
 \section{Popis paralelního algoritmu a jeho implementace v MPI}
 
-Po inicializaci master procesor vygeneruje syny korenu stromu stavoveho reseni a rozesle praci ostatnim procesorum. Pote kazdy procesor vstoupi do hlavni smycky, ktera se vykonava, dokud nedojde k ukonceni vypoctu.
+Po inicializaci master procesor vygeneruje syny kořenu stromu stavového řešení a rozešle práci ostatním procesorům. Pote každý procesor vstoupí do hlavni smyčky, která se vykonává, dokud nedojde k ukončení výpočtu.
 
-V hlavni smycce vybiraji prvky ze zasobniku a testuje se, zdali jsou, nebo nejsou resenim. Po M zpracovanych prvcich, nebo pokud nejsou prvky na zasobinku program prijme zpravy MPI a pote vysle zpravy MPI. Nasleduje popis zprav.
+V hlavni smyčce vybírají prvky ze zásobníku a testuje se, zdali jsou, nebo nejsou řešením. Po M zpracovaných prvcích, nebo pokud nejsou prvky na zásobníku program přijme zprávy MPI a pote vyšle zprávy MPI. Nasleduje popis zprav.
 
-Pokud procesor nalezne lepsi reseni, posle ho ostatnim.
+Pokud procesor nalezne lepší řešení, posle ho ostatním.
 
-Pokud procesor nema zadnou dalsi praci, pta se na ni postupne ostatnich procesoru. Kdyz odesle pozadavek, nedela nic jineho, nez ze ceka na odpoved a reaguje na prijate zpravy. Pokud procesor dostane zadost o praci, tak pokud ma dostatecny pocet prvku na zasobniku, praci mu posle. Prace se posila ve vice zpravach o velikosti 950kB.
+Pokud procesor nemá žádnou další práci, pta se na ni postupně ostatních procesorů. Když odešle požadavek, nedělá nic jiného, než že čeká na odpověď a reaguje na přijaté zprávy. Pokud procesor dostane zadost o práci, tak pokud má dostatečný počet prvku na zásobníku, práci mu posle. Práce se posílá ve více zprávách o velikosti 950kB.
 
-Pokud master procesoru dojde prace, krome zadosti o praci take vysle peska. Pesek je cisty a spinavy. Pokud nejaky procesor poslal praci procesoru s mensim rankem, je spinavy. Kdyz procesor dostane spinaveho peska, posle ho dal jako spinaveho. Po odeslani peska se ocisti. Kdyz se master procesoru vrati cisty pesek, rozesle zpravu o ukonceni vypoctu. Pokud nemaster procesor dostane zpravu o ukonceni vypoctu, odpovi bud ze zpravu prijal, nebo posle reseni s nejmensim poctem uzlu, pokud to byl on, co ho vypocital.
-
+Pokud master procesoru dojde práce, kromě žádosti o práci také vyšle peška. Pešek je čistý a špinavý. Pokud nějaký procesor poslal práci procesoru s menším rankem, je špinavý. Když procesor dostane špinavého peška, pošle ho dál jako špinavého. Po odeslání peška se očistí. Když se master procesoru vrátí čistý pešek, rozešle zprávu o ukončení výpočtu. Pokud nemaster procesor dostane zprávu o ukončení výpočtu, odpoví bud ze zprávu přijal, nebo posle řešení s nejmenším počtem uzlů, pokud to byl on, co ho vypočítal.
 
 \section{Naměřené výsledky a vyhodnocení}
+Pro měření jsem si vygenerovali 3 různé grafy. Graf 1 obsahuje 200 uzlů, průměrný stupeň uzlu je 4 a i-dominance je také 4. Graf 2 obsahuje 32 uzlů, průměrný stupeň uzlu je 6 a i-dominance je 1. Graf 3 obsahuje 50 uzlů, průměrný stupeň uzlu je 3 a i-dominance je také 2.
+
+Zrychlení na všech grafech jsme naměřili sublineární. Tento výsledek jsem očekávali, protože stejná práce je rozdělena mezi více procesorů a dále přibila komunikační režie mezi procesory. Pro graf 1 a graf 2 s 32 respektive 50 uzly dosáhl výpočet na 32 procesorech zrychlení téměř 15x. Podle grafu lze předpokládá, že zrychlení by se pro více procesorů dále zvětšovalo. Pro graf s 200 uzly na komunikační síti InfiniBand je nejlepší zrychlení pro 25 procesorů. Pak je už komunikační režie tak náročná, že dochází k poklesu zrychlení.
+
+Pro srovnání jsem naměřili výsledky na stejných grafech také pro komunikaci přes Ethernet. Rozdíl je nejvíce patrný na grafu 1 s 200 uzly. Na rozdíl od InfiniBandu nedochází na Ethernetu k poklesu zrychlení pro více procesorů. Pro 32 procesorů jsme dosáhli zrychlení téměř 8x. Také pro další grafy jsme dosáhli lepších výsledků při komunikaci přes Ethernet. Pro graf 2 s 32 uzly je zrychlení téměř ideální, pro 32 procesorů je přibližně 31x.
 
 \begin{table}
 	\caption{Naměřené hodnoty pro graf 1: n=200, k=4, i=4}
@@ -212,6 +216,12 @@ Pokud master procesoru dojde prace, krome zadosti o praci take vysle peska. Pese
 \end{figure}
 
 \section{Závěr}
-TODO
+Cílem tohoto projektu bylo vyzkoušet si programování počítače s distribuovanou pamětí za pomoci knihovny MPI. Tento cíl byl úspěšně splněn a výsledkem je funkční program na výpočet minimální i-dominující množiny grafu.
+
+Naměřené výsledky odpovídají naším předpokladům. Překvapením trochu bylo, že komunikace přes Ethernet je ve většině případů rychlejší než komunikace přes InfiniBand, která je pro takovéto systémy preferovaná.
+
+Pro grafy s velmi hodně uzly nejsou výsledky příliš uspokojivé. Dochází zde k problémům s návrhem posílání práce ostatním procesorům. Zvolili jsme posílání pouze malých zpráv do 1kB, abychom mohli využívat blokující variantu zpráv. Při posílání velkého množství práce pak dochází k rozdělení zásobníku do více zpráv a pravděpodobně také z zahlcení komunikační sítě. S tímto fakte si lépe poradí Ethernet než InfiniBand.
+
+Ještě lepších výsledků by šlo pravděpodobně dosáhnout předěláním posílání práce do jedné velké zprávy a tím pádem využití neblokujících variant zpráv.   
 
 \end{document}
