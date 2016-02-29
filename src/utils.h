@@ -5,11 +5,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-typedef int bool_t;
-#define FALSE 0
-#define TRUE 1
-
-
 #ifndef DEBUG
 
 #define ASSERT(condition) do { \
@@ -19,17 +14,17 @@ typedef int bool_t;
 		    #condition); \
 		abort(); \
 	} \
-} while(1)
+} while (0)
 
 #define DEBUG_PRINT(message) do { \
 	fprintf(stderr, "DEBUG: %s:%d: %s: %s", __FILE__,  __LINE__, \
 	    __FUNCTION__, message); \
-} while(0)
+} while (0)
 
 #define DEBUG_PRINTF(message, ...) do { \
 	fprintf(stderr, "DEBUG: %s:%d: %s: %s", __FILE__,  __LINE__, \
 	    __FUNCTION__, message, __VA_ARGS__); \
-} while(0)
+} while (0)
 
 #define DEBUG_CALL(call) call
 

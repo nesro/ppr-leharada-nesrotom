@@ -1,4 +1,3 @@
-
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -76,7 +75,7 @@ bit_array_count_nodes(bit_array_t *bit_array)
 	int i;
 	int counter = 0;
 
-	for(i = 0; i < bit_array->n; i++){
+	for (i = 0; i < bit_array->n; i++){
 		if(bit_array->data[i] == 1){
 			counter++;
 		}
