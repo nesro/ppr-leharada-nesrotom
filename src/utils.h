@@ -5,6 +5,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+typedef int bool_t;
+#define FALSE 0
+#define TRUE 1
+
 #ifndef DEBUG
 
 #define ASSERT(condition) do { \
