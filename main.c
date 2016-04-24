@@ -770,7 +770,7 @@ init_master_cpu(graph_t *graph, int i_domination){
 		item = stack_divide(stack);
 		if(item == NULL){
 			break;
-		}PI_CH
+		}
 
 		pack_position = 0;
 		MPI_Pack(&item->level, 1, MPI_INT, buffer, BUFFER_LENGTH, &pack_position, MPI_COMM_WORLD);

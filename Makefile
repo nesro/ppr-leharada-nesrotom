@@ -16,7 +16,7 @@ MPILD=$(MPICC)
 MKDIR_P=mkdir -p
 MAKE=make
 
-CFLAGS=-std=c99 -Wall -Werror -Wno-unused-function -pedantic
+CFLAGS=-std=c99 -Wextra -Wall -Werror -Wpedantic
 CLIBS=-lm
 
 SRC=./src

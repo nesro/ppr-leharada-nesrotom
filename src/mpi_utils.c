@@ -545,7 +545,7 @@ main_mpi(int *argc, char **argv[], const char *graph_filename, int i_domination)
 			stack_item_free(item);
 		} 
 
-		/* pokud uz nebylo nic v zasoniku, tak item je null */
+		/* pokud uz nebylo nic v zasobniku, tak item je null */
 		if (item == NULL ||
 		    (cycle % CYCLES_MPI_MESSAGES) == 0) {
 			mpi_recv(problem);
